@@ -1,0 +1,866 @@
+db_bench:  
+사용법 (USAGE):  
+./db_bench [OPTIONS]...
+
+  /usr/src/debug/gflags/gflags-2.2.2/src/gflags.cc에서의 플래그 (Flags):  
+    -flagfile (파일에서 플래그를 로드합니다)  
+      유형: string 기본값: ""  
+    -fromenv (환경 변수에서 플래그를 설정합니다 [예: 'export FLAGS_flag1=value'])  
+      유형: string 기본값: ""  
+    -tryfromenv (환경 변수에 존재하면 플래그를 설정합니다)  
+      유형: string 기본값: ""  
+    -undefok (쉼표로 구분된 플래그 이름 목록으로, 프로그램에서 해당 플래그를 정의하지 않아도 명령줄에서 지정할 수 있습니다.  
+      중요: 이 목록의 플래그 중 인수를 가진 플래그는 반드시 flag=value 형식을 사용해야 합니다.)  
+      유형: string 기본값: ""
+
+  /usr/src/debug/gflags/gflags-2.2.2/src/gflags_completions.cc에서의 플래그 (Flags):  
+    -tab_completion_columns (탭 완성 출력에 사용할 열의 수)  
+      유형: int32 기본값: 80  
+    -tab_completion_word (비어 있지 않으면, HandleCommandLineCompletions()가 프로세스를 가로채고 이 값에 대해 bash 스타일 명령줄 플래그 완성을 시도합니다.)  
+      유형: string 기본값: ""
+
+  /usr/src/debug/gflags/gflags-2.2.2/src/gflags_reporting.cc에서의 플래그 (Flags):  
+    -help (모든 플래그에 대한 도움말 표시 [팁: 모든 플래그는 두 개의 대시를 사용할 수 있음])  
+      유형: bool 기본값: false 현재값: true  
+    -helpfull (모든 플래그에 대한 도움말 표시 -- -help와 동일)  
+      유형: bool 기본값: false  
+    -helpmatch (지정된 문자열을 포함하는 모듈에 대한 도움말 표시)  
+      유형: string 기본값: ""  
+    -helpon (이 플래그 값에 의해 지정된 모듈에 대한 도움말 표시)  
+      유형: string 기본값: ""  
+    -helppackage (메인 패키지의 모든 모듈에 대한 도움말 표시)  
+      유형: bool 기본값: false  
+    -helpshort (이 프로그램의 메인 모듈에 대한 도움말만 표시)  
+      유형: bool 기본값: false  
+    -helpxml (도움말의 XML 버전을 생성)  
+      유형: bool 기본값: false  
+    -version (버전 및 빌드 정보를 표시하고 종료)  
+      유형: bool 기본값: false
+
+
+tools/db_bench_tool.cc에서의 플래그 (Flags):  
+  -adaptive_readahead (반복 중 각 레벨에서 하나의 파일에서 다음 파일로 내부 자동 사전 읽기 크기를 전달합니다.)  
+    유형: bool 기본값: false  
+  -advise_random_on_open (테이블 파일 열기에 대해 랜덤 액세스를 권장합니다.)  
+    유형: bool 기본값: true  
+  -allow_concurrent_memtable_write (여러 작성자가 메모리 테이블을 병렬로 업데이트할 수 있도록 허용합니다.)  
+    유형: bool 기본값: true  
+  -allow_data_in_errors (true로 설정하면 LOG 파일에 키나 값을 기록하는 등의 데이터 로깅을 허용합니다.)  
+    유형: bool 기본값: false  
+  -arena_block_size (Arena 메모리 할당에서 하나의 블록 크기(바이트 단위).)  
+    유형: int64 기본값: 0  
+  -async_io (true로 설정하면 RocksDB가 내부 자동 사전 읽기(prefetching)를 비동기적으로 수행합니다.)  
+    유형: bool 기본값: false  
+  -auto_prefix_mode (seek 벤치마크를 위한 auto_prefix_mode를 설정합니다.)  
+    유형: bool 기본값: false  
+  -auto_readahead_size (true로 설정하면 RocksDB가 Scan 중 사전 읽기 크기를 자동으로 조정합니다.)  
+    유형: bool 기본값: false  
+  -avoid_flush_during_recovery (true로 설정하면 가능한 경우 복구된 WAL 데이터를 플러시하지 않습니다.)  
+    유형: bool 기본값: false  
+  -backup_dir (비어 있지 않은 문자열이면 주어진 디렉터리를 백업에 사용합니다.)  
+    유형: string 기본값: ""  
+  -backup_rate_limit (0이 아닌 경우, db_bench가 DB 백업을 위한 읽기 및 쓰기를 속도 제한합니다. 이는 초당 작업 횟수(ops/second)로 지정된 전역 속도입니다.)  
+    유형: uint64 기본값: 0  
+  -batch_size (배치 크기)  
+    유형: int64 기본값: 1  
+  -benchmark_read_rate_limit (0이 아닌 경우, db_bench가 RocksDB의 읽기를 속도 제한합니다. 이는 초당 작업 횟수(ops/second)로 지정된 전역 속도입니다.)  
+    유형: uint64 기본값: 0  
+  -benchmark_write_rate_limit (0이 아닌 경우, db_bench가 RocksDB로의 쓰기를 속도 제한합니다. 이는 초당 바이트 수(bytes/second)로 지정된 전역 속도입니다.)  
+    유형: uint64 기본값: 0  
+
+  -benchmarks (쉼표로 구분된 작업 목록으로, 지정된 순서대로 실행됩니다. 사용 가능한 벤치마크:  
+    - fillseq -- 비동기 모드에서 키 순서대로 N개의 값을 씁니다.  
+    - fillseqdeterministic -- 지정된 키 순서대로 N개의 값을 쓰며 LSM 트리의 구조를 유지합니다.  
+    - fillrandom -- 비동기 모드에서 랜덤 키 순서대로 N개의 값을 씁니다.  
+    - filluniquerandomdeterministic -- 랜덤 키 순서대로 N개의 값을 쓰며 LSM 트리의 구조를 유지합니다.  
+    - overwrite -- 비동기 모드에서 랜덤 키 순서대로 N개의 값을 덮어씁니다.  
+    - fillsync -- 동기 모드에서 랜덤 키 순서대로 N/1000개의 값을 씁니다.  
+    - fill100K -- 비동기 모드에서 랜덤 순서로 N/1000개의 100K 값을 씁니다.  
+    - deleteseq -- 순차적으로 N개의 키를 삭제합니다.  
+    - deleterandom -- 랜덤 순서로 N개의 키를 삭제합니다.  
+    - readseq -- N번 순차적으로 읽습니다.  
+    - readtocache -- 데이터베이스를 순차적으로 읽는 1개의 쓰레드.  
+    - readreverse -- N번 역순으로 읽습니다.  
+    - readrandom -- 랜덤 순서로 N번 읽습니다.  
+    - readmissing -- 랜덤 순서로 누락된 N개의 키를 읽습니다.  
+    - readwhilewriting -- 1개의 작성자가 있고, N개의 쓰레드가 랜덤 읽기를 수행합니다.  
+    - readwhilemerging -- 1개의 병합 작업자, N개의 쓰레드가 랜덤 읽기를 수행합니다.  
+    - readwhilescanning -- 1개의 쓰레드가 전체 테이블을 스캔하고, N개의 쓰레드가 랜덤 읽기를 수행합니다.  
+    - readrandomwriterandom -- 랜덤 읽기와 쓰기를 수행하는 N개의 쓰레드.  
+    - updaterandom -- 랜덤 키에 대해 읽기-수정-쓰기를 수행하는 N개의 쓰레드.  
+    - xorupdaterandom -- 읽기-XOR-쓰기를 수행하는 N개의 쓰레드.  
+    - appendrandom -- 값이 증가하는 방식으로 읽기-수정-쓰기를 수행하는 N개의 쓰레드.  
+    - mergerandom -- 병합 연산자를 사용하여 updaterandom/appendrandom과 동일한 작업 수행. merge_operator와 함께 사용해야 함.  
+    - readrandommergerandom -- 랜덤 읽기 또는 병합 작업을 N번 수행. merge_operator와 함께 사용해야 함.  
+    - newiterator -- 반복적으로 iterator를 생성.  
+    - seekrandom -- N번 랜덤 탐색을 수행하며, 탐색마다 seek_nexts를 호출.  
+    - seekrandomwhilewriting -- seekrandom과 1개의 쓰레드로 덮어쓰기.  
+    - seekrandomwhilemerging -- seekrandom과 1개의 쓰레드로 병합 수행.  
+    - crc32c -- <블록 크기> 데이터를 반복적으로 crc32c 수행.  
+    - xxhash -- <블록 크기> 데이터를 반복적으로 xxHash 수행.  
+    - xxhash64 -- <블록 크기> 데이터를 반복적으로 xxHash64 수행.  
+    - xxh3 -- <블록 크기> 데이터를 반복적으로 XXH3 수행.  
+    - acquireload -- N*1000번 로드 수행.  
+    - fillseekseq -- 키를 순차적으로 작성한 후, 각 키로 탐색하며 읽습니다.  
+    - randomtransaction -- N개의 랜덤 트랜잭션을 실행하고 정확성을 검증.  
+    - randomreplacekeys -- 이전 버전을 삭제하고 새 버전을 삽입하며 N개의 키를 랜덤으로 교체.  
+    - timeseries -- 1개의 작성자가 시계열 데이터를 생성하며, 여러 독자가 랜덤 읽기를 수행.  
+      
+Meta operations:  
+  - compact -- 데이터베이스(DB)의 전체 압축을 수행합니다. 여러 번 수행하는 경우 무작위로 선택합니다.  
+  - compactall -- 데이터베이스(DB)의 전체 압축을 수행합니다.  
+  - compact0 -- L0을 L1으로 압축합니다.  
+  - compact1 -- L1을 L2로 압축합니다.  
+  - waitforcompaction -- 압축이 (아마도) 완료될 때까지 일시 중지합니다.  
+  - flush -- 메모리 테이블(memtable)을 플러시합니다.  
+  - stats -- 데이터베이스(DB) 통계를 출력합니다.  
+  - resetstats -- 데이터베이스(DB) 통계를 재설정합니다.  
+  - levelstats -- 레벨별 파일 및 바이트 수를 출력합니다.  
+  - memstats -- 메모리 테이블(memtable) 통계를 출력합니다.  
+  - sstables -- SSTable 정보를 출력합니다.  
+  - heapprofile -- 힙 프로파일을 덤프합니다(포트에서 지원하는 경우).  
+  - replay -- `trace_file`로 지정된 트레이스 파일을 재생합니다.  
+  - getmergeoperands -- 특정 키에 대해 정렬된 정수 리스트의 병합 레코드를 대량으로 삽입한 후, 다른 키의 조회 성능을 비교합니다.  
+    Get 후 정렬된 큰 리스트에서 이진 검색을 수행하는 것과, GetMergeOperands 후 정렬된 서브 리스트에서 검색하는 성능을 비교합니다.  
+    MergeOperator로는 `sortlist.h`를 사용합니다.  
+  - readrandomoperands -- `GetMergeOperands()`를 사용하여 랜덤 키를 읽습니다. 작업에는 드물지만 가능한 재시도가 포함되며, 이는  
+    쓰레드가 본 적이 없는 키(처음에는 8개)를 만났을 때 `Status::Incomplete()`가 발생한 경우입니다.  
+  - backup -- 현재 데이터베이스(DB)를 백업하고, 새 백업이 올바른지 확인합니다. 속도 제한은 `--backup_rate_limit`를 통해 지정할 수 있습니다.  
+  - restore -- 최신 백업에서 데이터베이스(DB)를 복원합니다. 속도 제한은 `--restore_rate_limit`를 통해 지정할 수 있습니다.  
+  - approximatememtablestats -- `GetApproximateMemTableStats`의 정확도를 테스트합니다.  
+    이상적으로는 `fillrandom` 이후 수행되며, 실제 정답은 `batch_size`입니다.  
+  - 기본값:  
+    `"fillseq,fillseqdeterministic,fillsync,fillrandom,filluniquerandomdeterministic,overwrite,readrandom,newiterator,newiteratorwhilewriting,seekrandom,seekrandomwhilewriting,seekrandomwhilemerging,readseq,readreverse,compact,compactall,flush,compact0,compact1,waitforcompaction,multireadrandom,mixgraph,readseq,readtorowcache,readtocache,readreverse,readwhilewriting,readwhilemerging,readwhilescanning,readrandomwriterandom,updaterandom,xorupdaterandom,approximatesizerandom,randomwithverify,fill100K,crc32c,xxhash,xxhash64,xxh3,compress,uncompress,acquireload,fillseekseq,randomtransaction,randomreplacekeys,timeseries,getmergeoperands,readrandomoperands,backup,restore,approximatememtablestats"`
+-blob_cache_numshardbits ([Integrated BlobDB] Blob 캐시의 샤드 수는 2 ** blob_cache_numshardbits입니다. 음수는 기본 설정을 사용함을 의미합니다. blob_cache_size가 0보다 클 때만 적용되며, 블록과 Blob 캐시가 서로 다를 경우에만 유효합니다 (use_shared_block_and_blob_cache = false).)  
+  타입: int32 기본값: 6  
+-blob_cache_size ([Integrated BlobDB] Blob 캐시로 사용할 바이트 수입니다. 블록과 Blob 캐시가 서로 다를 경우에만 유효합니다 (use_shared_block_and_blob_cache = false).)  
+  타입: uint64 기본값: 8388608  
+-blob_compaction_readahead_size ([Integrated BlobDB] Blob 파일에 대한 압축 사전 읽기 크기입니다.)  
+  타입: uint64 기본값: 0  
+-blob_compression_type ([Integrated BlobDB] Blob 파일에 저장된 큰 값에 사용할 압축 알고리즘입니다.)  
+  타입: string 기본값: "none"  
+-blob_db_bytes_per_sync ([Stacked BlobDB] Blob 파일을 동기화할 바이트 수입니다.)  
+  타입: uint64 기본값: 524288  
+-blob_db_compression_type ([Stacked BlobDB] Blob 파일의 Blob을 압축하는 데 사용할 알고리즘입니다.)  
+  타입: string 기본값: "snappy"  
+-blob_db_enable_gc ([Stacked BlobDB] BlobDB의 가비지 컬렉션을 활성화합니다.)  
+  타입: bool 기본값: false  
+-blob_db_file_size ([Stacked BlobDB] 각 Blob 파일의 목표 크기입니다.)  
+  타입: uint64 기본값: 268435456  
+-blob_db_gc_cutoff ([Stacked BlobDB] BlobDB 가비지 컬렉션의 기준 비율입니다.)  
+  타입: double 기본값: 0.25  
+-blob_db_is_fifo ([Stacked BlobDB] BlobDB에서 FIFO 제거 전략을 활성화합니다.)  
+  타입: bool 기본값: false  
+-blob_db_max_db_size ([Stacked BlobDB] Blob 파일이 저장되는 디렉터리의 최대 크기 제한입니다.)  
+  타입: uint64 기본값: 0  
+-blob_db_max_ttl_range ([Stacked BlobDB] BlobDB 데이터를 생성할 TTL 범위(초 단위). 0은 TTL이 없음을 의미합니다.)  
+  타입: uint64 기본값: 0  
+-blob_db_min_blob_size ([Stacked BlobDB] 파일에 저장할 최소 Blob 크기입니다. 이보다 작은 Blob은 LSM 트리에서 키와 함께 인라인 처리됩니다.)  
+  타입: uint64 기본값: 0  
+-blob_db_ttl_range_secs ([Stacked BlobDB] Blob 파일을 생성할 때 사용할 TTL 버킷 크기입니다.)  
+  타입: uint64 기본값: 3600  
+-blob_file_size ([Integrated BlobDB] Blob 파일의 크기 제한입니다.)  
+  타입: uint64 기본값: 268435456  
+-blob_file_starting_level ([Integrated BlobDB] Blob 파일의 시작 레벨입니다.)  
+  타입: int32 기본값: 0  
+-blob_garbage_collection_age_cutoff ([Integrated BlobDB] 가비지 컬렉션을 위한 Blob 파일의 연령 기준입니다.)  
+  타입: double 기본값: 0.25  
+-blob_garbage_collection_force_threshold ([Integrated BlobDB] 가비지 컬렉션을 강제 실행하기 위한 해당 Blob 파일의 가비지 비율 기준입니다.)  
+  타입: double 기본값: 1  
+-block_align (데이터 블록을 페이지 크기에 맞춥니다.)  
+  타입: bool 기본값: false  
+-block_cache_trace_file (블록 캐시 추적 파일 경로입니다.)  
+  타입: string 기본값: ""  
+-block_cache_trace_max_trace_file_size_in_bytes (블록 캐시 추적 파일의 최대 크기(바이트 단위). 추적 파일 크기가 이 임계값을 초과하면 블록 캐시 액세스가 기록되지 않습니다. 기본값은 64GB입니다.)  
+  타입: int64 기본값: 68719476736  
+-block_cache_trace_sampling_frequency (블록 캐시 추적 샘플링 빈도, s로 표현됩니다. 공간 다운샘플링을 사용하며, s개의 블록 중 하나의 액세스를 샘플링합니다.)  
+  타입: int32 기본값: 1  
+-block_protection_bytes_per_key (키-값별 블록 체크섬 보호를 활성화합니다. 지원되는 값: 0, 1, 2, 4, 8.)  
+  타입: uint32 기본값: 0  
+-block_restart_interval (데이터 블록에서 키의 델타 인코딩을 위한 재시작 지점 간의 키 수입니다.)  
+  타입: int32 기본값: 16  
+-block_size (블록 내의 바이트 수입니다.)  
+  타입: int32 기본값: 4096  
+-bloom_bits (키당 Bloom 필터 비트 수. 음수는 기본값 사용을 의미하며, 0은 비활성화를 의미합니다.)  
+  타입: int32 기본값: -1  
+-bloom_locality (Bloom 필터 탐침의 지역성을 제어합니다.)  
+  타입: int32 기본값: 0  
+-build_info (GetRocksBuildInfoAsString을 통해 빌드 정보를 출력합니다.)  
+  타입: bool 기본값: false  
+-bytes_per_sync (OS가 SST 파일을 백그라운드에서 작성 중 디스크에 점진적으로 동기화할 수 있도록 허용합니다. bytes_per_sync마다 하나의 요청을 발생시킵니다. 0은 비활성화를 의미합니다.)  
+  타입: uint64 기본값: 0  
+-cache_high_pri_pool_ratio (고우선순위 블록을 위한 블록 캐시 예약 비율. 값이 0.0보다 크면 `cache_index_and_filter_blocks_with_high_priority`도 활성화됩니다.)  
+  타입: double 기본값: 0  
+-cache_index_and_filter_blocks (블록 캐시에 인덱스/필터 블록을 캐싱합니다.)  
+  타입: bool 기본값: false  
+-cache_low_pri_pool_ratio (저우선순위 블록을 위한 블록 캐시 예약 비율입니다.)  
+  타입: double 기본값: 0  
+-cache_numshardbits (블록 캐시의 샤드 수는 2 ** cache_numshardbits입니다. 음수는 기본 설정 사용을 의미합니다. 이 설정은 `FLAGS_cache_size`가 음수가 아닐 때만 적용됩니다.)  
+  타입: int32 기본값: -1  
+-cache_size (비압축 데이터 캐시에 사용할 바이트 수입니다.)  
+  타입: int64 기본값: 33554432  
+-cache_type (블록 캐시의 유형입니다.)  
+  타입: string 기본값: "lru_cache"  
+-cache_uri (사용자 정의 캐시 객체를 생성하기 위한 전체 URI입니다.)  
+  타입: string 기본값: ""  
+-charge_blob_cache (`CacheEntryRole::kBlobCache`에 대한 `CacheEntryRoleOptions::charged` 설정입니다.)  
+  타입: bool 기본값: false  
+-charge_compression_dictionary_building_buffer (`CacheEntryRole::kCompressionDictionaryBuildingBuffer`에 대한 `CacheEntryRoleOptions::charged` 설정입니다.)  
+  타입: bool 기본값: false  
+-charge_file_metadata (`CacheEntryRole::kFileMetadata`에 대한 `CacheEntryRoleOptions::charged` 설정입니다.)  
+  타입: bool 기본값: false  
+-charge_filter_construction (`CacheEntryRole::kFilterConstruction`에 대한 `CacheEntryRoleOptions::charged` 설정입니다.)  
+  타입: bool 기본값: false  
+-charge_table_reader (`CacheEntryRole::kBlockBasedTableReader`에 대한 `CacheEntryRoleOptions::charged` 설정입니다.)  
+  타입: bool 기본값: false  
+-checksum_type (체크섬 유형을 정수로 지정합니다.)  
+  타입: int32 기본값: 4  
+-column_family_distribution (쉼표로 구분된 비율 목록으로, i번째 요소는 i번째 컬럼 패밀리에서 연산이 사용될 확률을 나타냅니다. 지정된 경우, 요소 수는 `num_hot_column_families`와 일치해야 합니다. 그렇지 않으면 `num_column_families`와 일치해야 합니다. 요소의 합계는 100이어야 합니다. 예: `num_column_families=4`, `num_hot_column_families=0`일 때, 유효한 목록은 "10,20,30,40"과 같습니다.)  
+  타입: string 기본값: ""  
+-compaction_pri (압축 파일의 우선순위: 크기별 또는 데이터 연령별)  
+  타입: int32 기본값: 3  
+-compaction_readahead_size (압축 사전 읽기 크기입니다.)  
+  타입: uint64 기본값: 2097152  
+-compaction_style (압축 스타일: 레벨 기반, 유니버설, FIFO)  
+  타입: int32 기본값: 0  
+-compressed_cache_size (압축된 데이터 캐시에 사용할 바이트 수입니다.)  
+  타입: int64 기본값: -1  
+-compressed_secondary_cache_compress_format_version (압축 형식 버전.  
+  `compress_format_version == 1`: 블록 헤더에 비압축 크기가 포함되지 않음.  
+  `compress_format_version == 2`: 비압축 크기가 varint32 형식으로 블록 헤더에 포함됨.)  
+  타입: uint32 기본값: 2  
+-compressed_secondary_cache_compression_level (압축 수준. 이 값의 의미는 라이브러리에 따라 다릅니다. 설정되지 않은 경우, `--compressed_secondary_cache_compression_type`에서 지정된 라이브러리의 기본값을 사용하려고 시도합니다.)  
+  타입: int32 기본값: 32767  
+-compressed_secondary_cache_compression_type (CompressedSecondaryCache에 저장된 큰 값을 압축하는 데 사용할 알고리즘입니다.)  
+  타입: string 기본값: "lz4"  
+-compressed_secondary_cache_high_pri_pool_ratio (고우선순위 블록을 위한 블록 캐시 예약 비율. 값이 0.0보다 크면 `cache_index_and_filter_blocks_with_high_priority`도 활성화됩니다.)  
+  타입: double 기본값: 0  
+-compressed_secondary_cache_low_pri_pool_ratio (저우선순위 블록을 위한 블록 캐시 예약 비율입니다.)  
+  타입: double 기본값: 0  
+-compressed_secondary_cache_numshardbits (블록 캐시의 샤드 수는 2 ** compressed_secondary_cache_numshardbits입니다. 음수는 기본 설정 사용을 의미합니다. 이 설정은 `FLAGS_cache_size`가 음수가 아닐 때만 적용됩니다.)  
+  타입: int32 기본값: 6  
+-compressed_secondary_cache_size (데이터 캐시에 사용할 바이트 수입니다.)  
+  타입: int64 기본값: 33554432  
+-compression_level (압축 수준. 이 값의 의미는 라이브러리에 따라 다릅니다. 설정되지 않은 경우, `--compression_type`에서 지정된 라이브러리의 기본값을 사용하려고 시도합니다.)  
+  타입: int32 기본값: 32767  
+-compression_max_dict_buffer_bytes (사전을 위한 샘플을 수집할 때 버퍼의 최대 바이트 수입니다.)  
+  타입: uint64 기본값: 0  
+-compression_max_dict_bytes (압축 라이브러리를 초기화하는 데 사용되는 사전의 최대 크기입니다.)  
+  타입: int32 기본값: 0  
+-compression_parallel_threads (병렬 압축을 위한 쓰레드 수입니다.)  
+  타입: int32 기본값: 1  
+-compression_ratio (압축 후 원래 크기의 몇 퍼센트로 축소되는 값을 생성합니다.)  
+  타입: double 기본값: 0.5  
+-compression_type (데이터베이스를 압축하는 데 사용할 알고리즘입니다.)  
+  타입: string 기본값: "snappy"  
+-compression_use_zstd_dict_trainer (true일 경우, ZSTD_TrainDictionary()를 사용하여 사전을 생성합니다. 그렇지 않으면 ZSTD_FinalizeDictionary()를 사용합니다.)  
+  타입: bool 기본값: true  
+-compression_zstd_max_train_bytes (zstd의 사전 트레이너에 전달되는 훈련 데이터의 최대 크기입니다.)  
+  타입: int32 기본값: 0  
+-confidence_interval_only (통합 통계에 대해 95% 신뢰 구간의 상한 및 하한만 출력합니다.)  
+  타입: bool 기본값: false  
+-cost_write_buffer_to_cache (메모리 테이블의 사용량이 블록 캐시로 부과됩니다.)  
+  타입: bool 기본값: false  
+-cuckoo_hash_ratio (Cuckoo SST 테이블의 해시 비율입니다.)  
+  타입: double 기본값: 0.9  
+-data_block_hash_table_util_ratio (데이터 블록 해시 인덱스 테이블의 활용 비율입니다. 이는 `use_data_block_hash_index`가 true로 설정된 경우에만 유효합니다.)  
+  타입: double 기본값: 0.75  
+-db (다음 이름을 가진 데이터베이스를 사용합니다.)  
+  타입: string 기본값: ""  
+-db_write_buffer_size (압축 전 모든 메모리 테이블에서 버퍼링할 바이트 수입니다.)  
+  타입: int64 기본값: 0  
+-decouple_partitioned_filters (필터 파티셔닝을 인덱스 파티셔닝에서 분리합니다.)  
+  타입: bool 기본값: false  
+-delayed_write_rate (soft_rate_limit 또는 level0_slowdown_writes_trigger가 작동할 때 데이터베이스(DB)에 허용되는 제한된 바이트 수입니다.)  
+  타입: uint64 기본값: 8388608  
+-delete_obsolete_files_period_micros (더 이상 사용되지 않음. 이전 버전과의 호환성을 위해 유지됨.)  
+  타입: uint64 기본값: 0  
+-deletepercent (읽기/쓰기/삭제 중 삭제가 차지하는 비율입니다. (RandomWithVerify에서만 사용) RandomWithVerify는 `writepercent`를 `(100 - FLAGS_readwritepercent - deletepercent)`로 계산하므로, `deletepercent`는 `(100 - FLAGS_readwritepercent)`보다 작아야 합니다.)  
+  타입: int32 기본값: 2  
+-deletes (실행할 삭제 연산의 수입니다. 음수인 경우 `FLAGS_num` 삭제를 수행합니다.)  
+  타입: int64 기본값: -1  
+-disable_auto_compactions (자동 압축 트리거를 비활성화합니다.)  
+  타입: bool 기본값: false  
+-disable_seek_compaction (사용되지 않음, 이전 버전과의 호환성을 위해 유지됨.)  
+  타입: int32 기본값: 0  
+-disable_wal (true일 경우, 쓰기 작업에서 WAL을 기록하지 않습니다.)  
+  타입: bool 기본값: false  
+-disposable_entries_batch_size (연속적으로 삽입된 disposable KV 항목 수로, 'delete_delay' 마이크로초 이후에 삭제됩니다. Disposable KV 항목이 DB에 모두 삽입된 후, 삭제 시리즈가 항상 실행됩니다. 0일 경우 삭제가 실행되지 않으며, 일반 `filluniquerandom` 벤치마크가 실행됩니다. (fillanddeleteuniquerandom 벤치마크와만 호환됩니다.))  
+  타입: uint64 기본값: 0  
+-disposable_entries_delete_delay (삭제 시리즈를 실행하기 위한 최소 지연 시간(마이크로초 단위). 0일 경우 마지막 disposable 항목이 삽입된 직후 삭제가 실행됩니다. (fillanddeleteuniquerandom 벤치마크와만 호환됩니다.))  
+  타입: uint64 기본값: 0  
+-disposable_entries_value_size (선택적 삭제 대상으로 하는 항목 값의 크기(바이트 단위). (fillanddeleteuniquerandom 벤치마크와만 호환됩니다.))  
+  타입: int32 기본값: 64  
+-dump_malloc_stats (LOG에 malloc 통계를 덤프합니다.)  
+  타입: bool 기본값: true  
+-duration (랜덤 연산 테스트를 실행할 시간(초 단위). 0일 경우, `num`과 `reads`가 테스트 실행 시간을 결정합니다.)  
+  타입: int32 기본값: 0  
+-enable_blob_files ([Integrated BlobDB] 큰 값을 별도의 Blob 파일에 기록하도록 활성화합니다.)  
+  타입: bool 기본값: false  
+-enable_blob_garbage_collection ([Integrated BlobDB] Blob 가비지 컬렉션을 활성화합니다.)  
+  타입: bool 기본값: false  
+-enable_cpu_prio (백그라운드 플러시/압축 스레드의 CPU 우선순위를 낮춥니다.)  
+  타입: bool 기본값: false  
+-enable_index_compression (인덱스 블록을 압축합니다.)  
+  타입: bool 기본값: true  
+-enable_io_prio (백그라운드 플러시/압축 스레드의 IO 우선순위를 낮춥니다.)  
+  타입: bool 기본값: false  
+-enable_numa (NUMA 아키텍처를 인식하여 작업을 수행하고, 메모리와 CPU를 해당 노드에 바인딩합니다. NUMA에서는 같은 노드의 CPU와 메모리가 다른 노드의 메모리보다 더 가깝습니다. 프로세스가 같은 노드의 CPU와 메모리에 바인딩되면 읽기 속도가 빨라질 수 있습니다. NUMA 메모리 아키텍처를 확인하려면 `$numactl --hardware` 명령을 사용하십시오.)  
+  타입: bool 기본값: false  
+-enable_pipelined_write (WAL 및 메모리 테이블 쓰기를 파이프라인 방식으로 허용합니다.)  
+  타입: bool 기본값: true  
+-enable_write_thread_adaptive_yield (짧은 작성 스레드 대기를 위해 yield 스핀 루프를 사용합니다.)  
+  타입: bool 기본값: true  
+-env_uri (레지스트리 Env 조회를 위한 URI입니다. --fs_uri와 상호 배타적입니다.)  
+  타입: string 기본값: ""  
+-expand_range_tombstones (범위 tombstone을 순차적인 일반 tombstone으로 확장합니다.)  
+  타입: bool 기본값: false  
+-experimental_mempurge_threshold (메모리 테이블 가비지 컬렉션(mempurge)을 트리거하는 최대 유효 페이로드 비율 추정치입니다.)  
+  타입: double 기본값: 0  
+-expire_style (만료된 시간 항목을 제거하는 방식입니다. 사용 가능한 옵션: `none` (데이터 만료 없음), `compaction_filter` (압축 필터를 사용하여 만료된 데이터를 제거), `delete` (ID를 탐색하고 만료된 데이터를 제거). (TimeSeries에서만 사용됩니다.))  
+  타입: string 기본값: "none"  
+-fifo_age_for_warm (FIFO 압축에서 warm 항목의 age입니다.)  
+  타입: uint64 기본값: 0  
+-fifo_compaction_allow_compaction (FIFO 압축에서 압축을 허용합니다.)  
+  타입: bool 기본값: true  
+-fifo_compaction_max_table_files_size_mb (FIFO 압축을 트리거하는 테이블 파일 크기의 총 한계입니다.)  
+  타입: uint64 기본값: 0  
+-fifo_compaction_ttl (SST 파일의 TTL(초 단위)입니다.)  
+  타입: uint64 기본값: 0  
+-file_checksum (true일 경우, file_checksum_gen_factory로 `FileChecksumGenCrc32cFactory`를 사용합니다.)  
+  타입: bool 기본값: false  
+-file_opening_threads (`open_files`가 -1로 설정된 경우, DB::Open() 중 파일을 여는 데 사용되는 스레드 수를 설정합니다.)  
+  타입: int32 기본값: 16  
+-finish_after_writes (모든 쓰기가 완료된 후 쓰기 스레드를 종료합니다.)  
+  타입: bool 기본값: false  
+-force_consistency_checks (변경 사항이 적용될 때마다 LSM에 대한 일관성 검사를 실행합니다.)  
+  타입: bool 기본값: true  
+-format_version (SST 파일의 포맷 버전입니다.)  
+  타입: int32 기본값: 6  
+-fs_uri (레지스트리 파일 시스템 조회를 위한 URI입니다. --env_uri와 상호 배타적입니다. 지정된 파일 시스템으로 기본 환경을 생성합니다.)  
+  타입: string 기본값: ""  
+-hard_pending_compaction_bytes_limit (대기 중인 압축 바이트가 이 숫자를 초과하면 쓰기를 중지합니다.)  
+  타입: uint64 기본값: 137438953472  
+-hash_bucket_count (해시 버킷 수입니다.)  
+  타입: int64 기본값: 1048576  
+-histogram (작업 타이밍의 히스토그램을 출력합니다.)  
+  타입: bool 기본값: false  
+-identity_as_first_hash (쿠쿠 테이블의 첫 번째 해시 함수가 ID 함수가 됩니다. 이는 키가 8바이트일 때만 유효합니다.)  
+  타입: bool 기본값: false  
+-index_block_restart_interval (인덱스 블록에서 키의 델타 인코딩을 위한 재시작 지점 간의 키 수입니다.)  
+  타입: int32 기본값: 1  
+-index_shortening_mode (인덱스를 단축하는 모드: 0은 단축 없음, 1은 구분자만 단축, 2는 구분자 및 후속 단축.)  
+  타입: int64 기본값: 2  
+-index_with_first_key (첫 번째 키를 인덱스에 포함합니다.)  
+  타입: bool 기본값: false  
+-initial_auto_readahead_size (사용자가 readahead_size를 제공하지 않는 경우, RocksDB는 테이블 파일에서 두 번 이상 읽기를 감지하면 자동 사전 읽기를 수행합니다. 이 사전 읽기 크기는 initial_auto_readahead_size에서 시작합니다.)  
+  타입: uint64 기본값: 8192  
+-inplace_update_num_locks (인플레이스 메모리 테이블 업데이트를 보호하기 위한 RW 잠금 수입니다.)  
+  타입: uint64 기본값: 10000  
+-inplace_update_support (더 작거나 같은 크기의 값에 대해 인플레이스 메모리 테이블 업데이트를 지원합니다.)  
+  타입: bool 기본값: false  
+-io_uring_enabled (플랫폼이 지원하는 경우 IO uring을 활성화합니다.)  
+  타입: bool 기본값: true  
+-iter_k (일반화된 파레토 분포의 매개변수 'k'.  
+  f(x)=(1/sigma)*(1+k*(x-theta)/sigma)^-(1/k+1))  
+  타입: double 기본값: 2.517  
+-iter_sigma (일반화된 파레토 분포의 매개변수 'sigma'.  
+  f(x)=(1/sigma)*(1+k*(x-theta)/sigma)^-(1/k+1))  
+  타입: double 기본값: 14.236  
+-iter_theta (일반화된 파레토 분포의 매개변수 'theta'.  
+  f(x)=(1/sigma)*(1+k*(x-theta)/sigma)^-(1/k+1))  
+  타입: double 기본값: 0  
+-key_dist_a (키 접근 분포 모델의 매개변수 'a'.  
+  f(x)=a*x^b)  
+  타입: double 기본값: 0  
+-key_dist_b (키 접근 분포 모델의 매개변수 'b'.  
+  f(x)=a*x^b)  
+  타입: double 기본값: 0  
+-key_id_range (키 ID의 가능한 값 범위 (TimeSeries에서만 사용).)  
+  타입: int32 기본값: 100000  
+-key_size (각 키의 크기입니다.)  
+  타입: int32 기본값: 16  
+-keyrange_dist_a (접두사 평균 접근 분포의 매개변수 'a'.  
+  f(x)=a*exp(b*x)+c*exp(d*x))  
+  타입: double 기본값: 0  
+-keyrange_dist_b (접두사 평균 접근 분포의 매개변수 'b'.  
+  f(x)=a*exp(b*x)+c*exp(d*x))  
+  타입: double 기본값: 0  
+-keyrange_dist_c (접두사 평균 접근 분포의 매개변수 'c'.  
+  f(x)=a*exp(b*x)+c*exp(d*x))  
+  타입: double 기본값: 0  
+-keyrange_dist_d (접두사 평균 접근 분포의 매개변수 'd'.  
+  f(x)=a*exp(b*x)+c*exp(d*x))  
+  타입: double 기본값: 0  
+-keyrange_num (같은 접두사 그룹에 있는 키 범위의 수입니다. 각 접두사 범위는 자체 키 접근 분포를 가집니다.)  
+  타입: int64 기본값: 1  
+-keys_per_prefix (접두사당 생성된 평균 키 수를 제어합니다. 0은 접두사에 대해 특별한 처리가 없음을 의미합니다. 즉, 생성된 난수에 접두사를 사용합니다.)  
+  타입: int64 기본값: 0  
+-leader_path (리더 데이터베이스(DB)의 디렉터리 경로입니다.)  
+  타입: string 기본값: ""  
+-level0_file_num_compaction_trigger (압축이 시작되는 level-0의 파일 수입니다.)  
+  타입: int32 기본값: 4  
+-level0_slowdown_writes_trigger (쓰기 속도를 늦추는 level-0의 파일 수입니다.)  
+  타입: int32 기본값: 20  
+-level0_stop_writes_trigger (쓰기 중지를 트리거하는 level-0의 파일 수입니다.)  
+  타입: int32 기본값: 36  
+-level_compaction_dynamic_level_bytes (레벨 크기 기준이 동적인지 여부를 나타냅니다.)  
+  타입: bool 기본값: false  
+-log_readahead_size (WAL 및 매니페스트 사전 읽기 크기입니다.)  
+  타입: int32 기본값: 0  
+-manual_wal_flush (true일 경우, WAL 버퍼를 가득 채우거나 수동 FlushWAL() 호출 시까지 WAL을 버퍼링합니다.)  
+  타입: bool 기본값: false  
+-max_auto_readahead_size (RocksDB의 암묵적 사전 읽기는 `BlockBasedTableOptions.initial_auto_readahead_size`에서 시작하며, 추가 읽기마다 크기가 두 배로 증가하여 max_auto_readahead_size에 도달합니다.)  
+  타입: uint64 기본값: 262144  
+-max_background_compactions (병렬로 실행할 수 있는 백그라운드 압축 작업의 최대 개수입니다.)  
+  타입: int32 기본값: -1  
+-max_background_flushes (병렬로 실행할 수 있는 백그라운드 플러시 작업의 최대 개수입니다.)  
+  타입: int32 기본값: -1  
+-max_background_jobs (병렬로 실행할 수 있는 백그라운드 작업의 최대 개수입니다.)  
+  타입: int32 기본값: 2  
+-max_bytes_for_level_base (레벨-1의 최대 바이트 크기입니다.)  
+  타입: uint64 기본값: 268435456  
+-max_bytes_for_level_multiplier (레벨-N(N >= 2)의 최대 바이트 크기를 계산하는 배수입니다.)  
+  타입: double 기본값: 10  
+-max_bytes_for_level_multiplier_additional (레벨별 추가 확산(fanout)을 지정하는 벡터입니다.)  
+  타입: string 기본값: ""  
+-max_compaction_bytes (하나의 압축에 허용되는 최대 바이트 크기입니다.)  
+  타입: uint64 기본값: 0  
+-max_num_range_tombstones (삽입할 수 있는 범위 tombstone의 최대 개수입니다.)  
+  타입: int64 기본값: 0  
+-max_scan_distance (값이 0이 아닐 경우, iterate_upper_bound(또는 `FLAGS_reverse_iterator`가 true로 설정된 경우 iterate_lower_bound)를 정의하는 데 사용됩니다.)  
+  타입: int64 기본값: 0  
+-max_successive_merges (메모리 테이블에서 하나의 키에 대해 연속으로 실행할 수 있는 병합 작업의 최대 개수입니다.)  
+  타입: int32 기본값: 0  
+-max_total_wal_size (전체 WAL 크기의 최대값을 설정합니다.)  
+  타입: uint64 기본값: 0  
+-max_write_buffer_number (메모리 내 메모리 테이블(memtable)의 개수입니다. 각 메모리 테이블은 write_buffer_size 바이트 크기를 가집니다.)  
+  타입: int32 기본값: 2  
+-max_write_buffer_number_to_maintain (메모리에서 유지할 수 있는 최대 쓰기 버퍼의 총 개수입니다. 여기에는 이미 플러시된 버퍼의 복사본도 포함됩니다. 이 값은 flushing에 영향을 미치지 않으며, 트랜잭션 사용 시 충돌 검사를 위한 최소한의 쓰기 기록을 메모리에 보관합니다. 이 값이 너무 낮으면 커밋 시점에서 쓰기 충돌 여부를 확인할 수 없어 일부 트랜잭션이 실패할 수 있습니다. 0으로 설정하면 플러시된 후 즉시 쓰기 버퍼가 해제됩니다. -1로 설정하면 `max_write_buffer_number`가 사용됩니다.)  
+  타입: int32 기본값: 0  
+-max_write_buffer_size_to_maintain (메모리에서 유지할 수 있는 최대 쓰기 버퍼 크기입니다. flushing에는 영향을 미치지 않으며, 트랜잭션 사용 시 충돌 검사를 위한 최소 쓰기 기록을 제공합니다. 값이 너무 낮으면 충돌 검사를 할 수 없어 트랜잭션 실패로 이어질 수 있습니다. 0으로 설정하면 플러시된 후 즉시 쓰기 버퍼가 해제됩니다. -1로 설정하면 `max_write_buffer_number`가 사용됩니다.)  
+  타입: int64 기본값: 0  
+-memtable_bloom_size_ratio (메모리 테이블 크기에서 bloom 필터에 사용할 비율입니다. 0은 bloom 필터를 사용하지 않음을 의미합니다.)  
+  타입: double 기본값: 0  
+-memtable_insert_with_hint_prefix_size (0이 아닌 경우, 지정된 접두사 크기로 힌트를 사용하여 메모리 테이블에 삽입을 활성화합니다.)  
+  타입: int32 기본값: 0  
+-memtable_protection_bytes_per_key (키-값당 메모리 테이블 체크섬 보호를 활성화합니다. 메모리 테이블의 각 항목은 키-값당 체크섬이 접미사로 추가됩니다. 지원되는 값: 0, 1, 2, 4, 8.)  
+  타입: uint32 기본값: 0  
+-memtable_use_huge_page (메모리 테이블에서 huge page를 사용하려고 시도합니다.)  
+  타입: bool 기본값: false  
+-memtable_whole_key_filtering (메모리 테이블에서 전체 키 bloom 필터를 사용하려고 시도합니다.)  
+  타입: bool 기본값: false  
+-memtablerep ()  
+  타입: string 기본값: "skip_list"  
+-merge_keys (MergeRandom 및 ReadRandomMergeRandom에 사용할 고유 키의 개수입니다. 음수인 경우 `FLAGS_num` 키가 사용됩니다.)  
+  타입: int64 기본값: -1  
+-merge_operator (데이터베이스에서 사용할 병합 연산자입니다. 새 병합 연산자를 지정한 경우 새 데이터베이스를 사용해야 합니다. 가능한 병합 연산자는 `utilities/merge_operators.h`에 정의되어 있습니다.)  
+  타입: string 기본값: ""  
+-mergereadpercent (ReadRandomMergeRandom 작업에서 병합 및 읽기 비율(백분율로 표현)입니다. 기본값인 70은 모든 읽기 및 병합 작업 중 70%가 병합임을 의미합니다. 즉, 읽기 3회마다 병합이 7회 실행됩니다.)  
+  타입: int32 기본값: 70  
+-metadata_block_size (인덱스/필터를 파티셔닝할 때의 최대 파티션 크기입니다.)  
+  타입: int64 기본값: 4096  
+-min_blob_size ([Integrated BlobDB] Blob 파일에 별도로 저장할 최소 값 크기입니다.)  
+  타입: uint64 기본값: 0  
+-min_level_to_compress (0 이상의 경우, 압축이 이 레벨부터 시작됩니다. 숫자가 min_level_to_compress보다 작은 레벨은 압축되지 않습니다. 그렇지 않으면 compression_type이 모든 레벨에 적용됩니다.)  
+  타입: int32 기본값: -1  
+-min_write_buffer_number_to_merge (스토리지에 쓰기 전에 병합할 최소 쓰기 버퍼의 수입니다. 이는 메모리 내 병합이기 때문에 저렴하며, 이 기능이 활성화되지 않으면 모든 쓰기 버퍼가 개별 파일로 L0에 플러시되어 읽기 증폭이 증가합니다. 또한, 메모리 내 병합은 각 쓰기 버퍼의 중복 레코드가 있는 경우 저장소에 쓰는 데이터를 줄일 수 있습니다.)  
+  타입: int32 기본값: 1  
+-mix_accesses (mix_graph 워크로드의 총 쿼리 접근 수입니다.)  
+  타입: int64 기본값: -1  
+-mix_get_ratio (mix_graph 워크로드에서 Get 쿼리의 비율입니다.)  
+  타입: double 기본값: 1  
+-mix_max_scan_len (Iterator의 최대 스캔 길이입니다.)  
+  타입: int64 기본값: 10000  
+-mix_max_value_size (이 워크로드의 최대 값 크기입니다.)  
+  타입: int64 기본값: 1024  
+-mix_put_ratio (mix_graph 워크로드에서 Put 쿼리의 비율입니다.)  
+  타입: double 기본값: 0  
+-mix_seek_ratio (mix_graph 워크로드에서 Seek 쿼리의 비율입니다.)  
+  타입: double 기본값: 0  
+-mmap_read (파일을 mmap하여 읽기를 허용합니다.)  
+  타입: bool 기본값: false  
+-mmap_write (파일을 mmap하여 쓰기를 허용합니다.)  
+  타입: bool 기본값: false  
+-multiread_batched (새로운 MultiGet API를 사용합니다.)  
+  타입: bool 기본값: false  
+-multiread_stride (MultiGet 배치에서 키의 스트라이드 길이입니다.)  
+  타입: int64 기본값: 0  
+-num (데이터베이스에 배치할 키/값의 수입니다.)  
+  타입: int64 기본값: 1000000  
+-num_bottom_pri_threads (최하위 우선순위 스레드 풀의 스레드 수입니다. (유니버설 압축에서만 사용))  
+  타입: int32 기본값: 0  
+-num_column_families (사용할 컬럼 패밀리 수입니다.)  
+  타입: int32 기본값: 1  
+-num_deletion_threads (삭제 작업을 수행할 스레드 수입니다. (TimeSeries 및 delete expire_style에서만 사용))  
+  타입: int32 기본값: 1  
+-num_file_reads_for_auto_readahead (읽기가 순차적인 경우 RocksDB 암묵적 사전 읽기가 활성화됩니다. 이 값은 파일에 대한 내부 자동 프리패칭이 시작되기 전에 몇 번의 순차 읽기가 수행되어야 하는지를 나타냅니다.)  
+  타입: uint64 기본값: 2  
+-num_high_pri_threads (병렬로 실행할 수 있는 백그라운드 압축 작업의 최대 개수입니다.)  
+  타입: int32 기본값: 0  
+-num_hot_column_families (Hot 컬럼 패밀리의 수입니다. 0보다 큰 경우, 이 수의 컬럼 패밀리에만 쓰기를 수행합니다. 모든 쓰기가 완료되면 새 컬럼 패밀리 세트를 생성하고 거기에 삽입합니다. (num_column_families > 1일 때만 사용))  
+  타입: int32 기본값: 0  
+-num_levels (전체 레벨 수입니다.)  
+  타입: int32 기본값: 7  
+-num_low_pri_threads (병렬로 실행할 수 있는 백그라운드 압축 작업의 최대 개수입니다.)  
+  타입: int32 기본값: 0  
+-num_multi_db (벤치마크에서 사용되는 데이터베이스 수입니다. 0은 단일 데이터베이스를 의미합니다.)  
+  타입: int32 기본값: 0  
+-numdistinct (사용할 고유 키의 수입니다. RandomWithVerify에서 더 적은 키에 대해 읽기/쓰기를 수행하여, Get 연산이 키를 더 자주 찾을 수 있고 Put 연산이 동일한 키를 더 자주 업데이트할 가능성이 높아지도록 사용됩니다.)  
+  타입: int64 기본값: 1000  
+-open_as_follower (RocksDB 데이터베이스(DB)를 팔로워로 엽니다. 리더 인스턴스는 다른 db_bench 프로세스에서 실행될 수 있습니다.)  
+  타입: bool 기본값: false  
+-open_files (동시에 열어둘 수 있는 파일의 최대 수입니다. (0일 경우 기본값 사용))  
+  타입: int32 기본값: -1  
+-ops_between_duration_checks (x회 연산마다 실행 제한 시간을 확인합니다.)  
+  타입: int32 기본값: 1000  
+-optimistic_transaction_db (OptimisticTransactionDB 인스턴스를 엽니다. randomtransaction 벤치마크에 필요합니다.)  
+  타입: bool 기본값: false  
+-optimize_filters_for_hits (대부분의 조회가 값을 반환하는 워크로드에 대해 bloom 필터를 최적화합니다. 현재는 LSM의 최대 레벨에 대해 bloom 필터를 생성하지 않아 메타데이터를 RAM에 적합하게 줄입니다.)  
+  타입: bool 기본값: false  
+-optimize_filters_for_memory (필터의 메모리 사용량을 최소화합니다.)  
+  타입: bool 기본값: true  
+-optimize_multiget_for_io (true로 설정된 경우, RocksDB는 MultiGet에 대해 여러 레벨의 SST 파일을 비동기적으로 읽습니다.)  
+  타입: bool 기본값: true  
+-options_file (RocksDB 옵션 파일의 경로입니다. 지정된 경우, db_bench는 해당 옵션 파일의 기본 컬럼 패밀리에 있는 RocksDB 옵션으로 실행됩니다. 이 설정을 사용하면, RocksDB 옵션과 관련된 다음 명령줄 인수만 db_bench에서 허용됩니다. 그 외 모든 RocksDB 옵션 관련 인수는 무시됩니다:  
+  - `--use_existing_db`  
+  - `--use_existing_keys`  
+  - `--statistics`  
+  - `--row_cache_size`  
+  - `--row_cache_numshardbits`  
+  - `--enable_io_prio`  
+  - `--dump_malloc_stats`  
+  - `--num_multi_db`  
+)  
+  타입: string 기본값: ""  
+-overwrite_probability ('filluniquerandom' 벤치마크에서 사용됩니다. 각 쓰기 작업에 대해, 덮어쓰기를 수행할 확률을 지정합니다. 덮어쓰기에 사용되는 키는 데이터베이스에 마지막으로 삽입된 'overwrite_window_size' 키 중에서 무작위로 선택됩니다. 유효한 overwrite_probability 값: [0.0, 1.0])  
+  타입: double 기본값: 0  
+-overwrite_window_size ('filluniquerandom' 벤치마크에서 사용됩니다. 각 쓰기 작업에 대해, 사용자가 overwrite_probability 플래그를 설정한 경우, 덮어쓰기에 사용되는 키는 데이터베이스에 마지막으로 삽입된 'overwrite_window_size' 키 중에서 무작위로 선택됩니다. 경고: 큰 값은 처리량에 영향을 줄 수 있습니다. 유효한 overwrite_window_size 값: [1, kMaxUint32])  
+  타입: uint32 기본값: 1  
+-paranoid_checks (RocksDB는 데이터를 적극적으로 일관성 검사를 수행합니다.)  
+  타입: bool 기본값: true  
+-paranoid_memory_checks (CF 옵션 paranoid_memory_checks를 설정합니다.)  
+  타입: bool 기본값: false  
+-partition_index (인덱스 블록을 파티션화합니다.)  
+  타입: bool 기본값: false  
+-partition_index_and_filters (인덱스 및 필터 블록을 파티션화합니다.)  
+  타입: bool 기본값: false  
+-perf_level (성능 수집 수준입니다.)  
+  타입: int32 기본값: 1  
+-periodic_compaction_seconds (이보다 오래된 파일은 압축 대상이 되어 동일한 레벨로 다시 작성됩니다.)  
+  타입: uint64 기본값: 18446744073709551614  
+-persist_stats_to_disk (통계를 디스크에 유지할지 여부를 설정합니다.)  
+  타입: bool 기본값: false  
+-persistent_entries_batch_size (삭제 작업이 실행되기 직전에 삽입되는 KV 항목 수입니다. 이러한 영구 키는 삭제 대상이 아니며 데이터베이스(DB)에서 항상 유효하게 유지됩니다. (옵션: --benchmarks='fillanddeleteuniquerandom'과 호환되며, --disposable_entries_batch_size > 0인 경우에 사용됩니다.))  
+  타입: uint64 기본값: 0  
+-persistent_entries_value_size (삭제 대상이 아닌 항목 값의 크기(바이트 단위)입니다. (옵션: --benchmarks='fillanddeleteuniquerandom'과 호환되며, --disposable_entries_batch_size > 0인 경우에 사용됩니다.))  
+  타입: int32 기본값: 64  
+-pin_l0_filter_and_index_blocks_in_cache (L0 파일의 인덱스/필터 블록을 블록 캐시에 고정합니다.)  
+  타입: bool 기본값: false  
+-pin_top_level_index_and_filter (파티션화된 인덱스/필터 블록의 최상위 인덱스를 블록 캐시에 고정합니다.)  
+  타입: bool 기본값: false  
+-preclude_last_level_data_seconds (최신 데이터를 마지막 레벨에서 제외합니다. (계층형 스토리지에서 사용됨))  
+  타입: int64 기본값: 0  
+-prefix_same_as_start (Iterator가 Seek 키와 동일한 접두사를 가진 키를 반환하도록 강제합니다.)  
+  타입: bool 기본값: false  
+-prefix_size (HashSkipList 및 plain 테이블에 대한 접두사 크기를 제어합니다.)  
+  타입: int32 기본값: 0  
+-prepopulate_blob_cache ([Integrated BlobDB] Blob 캐시에 핫/웜 Blob을 미리 채웁니다. 0은 비활성화하고, 1은 플러시 중 삽입합니다.)  
+  타입: int32 기본값: 0  
+-prepopulate_block_cache (블록 캐시에 핫/웜 블록을 미리 채웁니다. 0은 비활성화하고, 1은 플러시 중 삽입합니다.)  
+  타입: int64 기본값: 0  
+-preserve_internal_time_seconds (SST와 함께 저장된 내부 시간 정보를 유지합니다.)  
+  타입: int64 기본값: 0  
+-print_malloc_stats (벤치마크가 완료된 후 malloc 통계를 표준 출력으로 출력합니다.)  
+  타입: bool 기본값: false  
+-progress_reports (true로 설정하면, db_bench는 완료된 작업 수를 보고합니다.)  
+  타입: bool 기본값: true  
+-random_access_max_buffer_size (랜덤 접근 버퍼의 최대 크기(바이트 단위)입니다.)  
+  타입: int32 기본값: 1048576  
+-range_tombstone_width (tombstone의 범위에 있는 키의 수입니다.)  
+  타입: int64 기본값: 100  
+-rate_limit_auto_wal_flush (true일 경우, 사용자 쓰기 작업 후 자동 WAL 플러시에 대해 내부 속도 제한기를 Env::IO_USER 우선순위 수준으로 사용합니다.)  
+  타입: bool 기본값: false  
+-rate_limit_bg_reads (압축 읽기에 대해 options.rate_limiter를 사용합니다.)  
+  타입: bool 기본값: false  
+-rate_limit_user_ops (true일 경우, 사용자 작업과 관련된 읽기에 대해 내부 속도 제한기를 Env::IO_USER 우선순위 수준으로 사용합니다.)  
+  타입: bool 기본값: false  
+-rate_limiter_auto_tuned (백그라운드 I/O 수요에 따라 속도 제한을 동적으로 조정하도록 활성화합니다.)  
+  타입: bool 기본값: false  
+-rate_limiter_bytes_per_sec (options.rate_limiter 값을 설정합니다.)  
+  타입: uint64 기본값: 0  
+-rate_limiter_refill_period_us (속도 제한기(rate limiter)의 리필 주기를 설정합니다.)  
+  타입: int64 기본값: 100000  
+-rate_limiter_single_burst_bytes (백그라운드 I/O 속도 제한기의 단일 버스트 크기를 설정합니다.)  
+  타입: int64 기본값: 0  
+-read_amp_bytes_per_bit (블록 읽기-증폭 비트맵에 사용되는 바이트 수입니다.)  
+  타입: int32 기본값: 0  
+-read_cache_direct_read (읽기 캐시에서 읽기를 위해 Direct IO를 사용할지 여부입니다.)  
+  타입: bool 기본값: true  
+-read_cache_direct_write (읽기 캐시에 쓰기를 위해 Direct IO를 사용할지 여부입니다.)  
+  타입: bool 기본값: true  
+-read_cache_path (빈 문자열이 아닌 경우, 이 경로에서 읽기 캐시가 사용됩니다.)  
+  타입: string 기본값: ""  
+-read_cache_size (읽기 캐시의 최대 크기입니다.)  
+  타입: int64 기본값: 4294967296  
+-read_random_exp_range (readrandom 및 multireadrandom 벤치마크에서 키가 num * exp(-r)의 분포를 사용해 생성됩니다. 여기서 r은 0부터 이 값까지의 균등 숫자입니다. 값이 클수록 읽기가 더 편향됩니다.)  
+  타입: double 기본값: 0  
+-read_with_latest_user_timestamp (true인 경우, 항상 최신 타임스탬프를 사용하여 읽습니다. false인 경우, 과거의 랜덤 타임스탬프를 선택합니다.)  
+  타입: bool 기본값: true  
+-readahead_size (Iterator 사전 읽기 크기입니다.)  
+  타입: int32 기본값: 0  
+-readonly (읽기 전용 벤치마크를 실행합니다.)  
+  타입: bool 기본값: false  
+-reads (수행할 읽기 작업 수입니다. 음수인 경우 `FLAGS_num`만큼 읽기를 수행합니다.)  
+  타입: int64 기본값: -1  
+-readwritepercent (ReadRandomWriteRandom 워크로드에서 읽기/쓰기 비율(백분율)입니다. 기본값 90은 읽기와 쓰기 작업 중 90%가 읽기임을 의미합니다. 즉, 1회 쓰기마다 9회 읽기를 수행합니다.)  
+  타입: int32 기본값: 90  
+-report_bg_io_stats (압축 중 I/O에 소비된 시간을 측정합니다.)  
+  타입: bool 기본값: false  
+-report_file (간단한 통계를 보고할 파일 이름입니다. --report_interval_seconds가 0보다 큰 경우에 사용됩니다.)  
+  타입: string 기본값: "report.csv"  
+-report_file_operations (파일 작업 수를 보고할지 여부입니다.)  
+  타입: bool 기본값: false  
+-report_interval_seconds (0보다 크면, 지정된 간격마다 --report_file에 간단한 통계를 CSV 형식으로 기록합니다.)  
+  타입: int64 기본값: 0  
+-report_open_timing (열기 시간(timing)을 보고할지 여부입니다.)  
+  타입: bool 기본값: false  
+-restore_dir (빈 문자열이 아닌 경우, 복원을 위해 지정된 디렉터리를 사용합니다.)  
+  타입: string 기본값: ""  
+-restore_rate_limit (0이 아닌 경우, 데이터베이스(DB) 복원을 위한 읽기 및 쓰기를 속도 제한합니다. 이 값은 초당 작업 수를 나타냅니다.)  
+  타입: uint64 기본값: 0  
+-reverse_iterator (true일 경우, Seek 후 Next 대신 Prev를 사용하여 Iterator를 설정합니다.)  
+  타입: bool 기본값: false  
+-row_cache_size (개별 행의 캐시로 사용할 바이트 수입니다. (0 = 비활성화))  
+  타입: int64 기본값: 0  
+-sample_for_compression (압축을 위한 샘플 간격(N 블록당 한 번)입니다.)  
+  타입: int64 기본값: 0  
+-secondary_cache_uri (사용자 정의 보조 캐시 객체를 생성하기 위한 전체 URI입니다.)  
+  타입: string 기본값: ""  
+-secondary_path (보조 인스턴스가 개인 파일(예: 로그)을 저장하는 데 사용하는 디렉터리 경로입니다.)  
+  타입: string 기본값: ""  
+-secondary_update_interval (보조 인스턴스가 기본(primary) 인스턴스를 따라잡으려 시도하는 간격(초 단위)입니다.)  
+  타입: int32 기본값: 5  
+-seed (랜덤 숫자 생성기의 기본값입니다. 0이면 현재 시간에서 파생됩니다.)  
+  타입: int64 기본값: 0  
+-seek_missing_prefix (Iterator가 존재하지 않는 접두사를 가진 키를 탐색하도록 설정합니다. prefix_size > 8이 필요합니다.)  
+  타입: bool 기본값: false  
+-seek_nexts (fillseekseq, seekrandom, seekrandomwhilewriting, seekrandomwhilemerging에서 Seek() 후 Next()를 호출할 횟수입니다.)  
+  타입: int32 기본값: 0  
+-show_table_properties (true인 경우, stats-interval 및 stats_per_interval이 활성화된 상태에서 레벨별 테이블 속성을 통계 간격마다 출력합니다.)  
+  타입: bool 기본값: false  
+-simcache_size (비압축 데이터를 위한 simcache로 사용할 바이트 수입니다. 음수 값은 simcache를 비활성화합니다.)  
+  타입: int64 기본값: -1  
+-simulate_hdd (HDD에서 읽기/쓰기 지연을 시뮬레이션합니다.)  
+  타입: bool 기본값: false  
+-simulate_hybrid_fs_file (하이브리드 파일 시스템 시뮬레이션을 위한 메타데이터 저장 파일입니다. 빈 문자열이면 이 기능이 비활성화됩니다. 설정된 경우, 마지막 레벨 온도는 kWarm으로 설정됩니다.)  
+  타입: string 기본값: ""  
+-simulate_hybrid_hdd_multipliers (simulate_hybrid_fs_file 또는 simulate_hdd 모드에서, 시뮬레이션할 HDD 수입니다.)  
+  타입: int32 기본값: 1  
+-sine_a (f(x) = A sin(bx + c) + d에서 A입니다.)  
+  타입: double 기본값: 1  
+-sine_b (f(x) = A sin(bx + c) + d에서 B입니다.)  
+  타입: double 기본값: 1  
+-sine_c (f(x) = A sin(bx + c) + d에서 C입니다.)  
+  타입: double 기본값: 0  
+-sine_d (f(x) = A sin(bx + c) + d에서 D입니다.)  
+  타입: double 기본값: 1  
+-sine_mix_rate (mix 워크로드에서 사인파 QPS 제어를 활성화합니다.)  
+  타입: bool 기본값: false  
+-sine_mix_rate_interval_milliseconds (사인파 읽기 속도 제한을 다시 계산하는 간격(밀리초 단위)입니다.)  
+  타입: uint64 기본값: 10000  
+-sine_mix_rate_noise (사인 속도에 추가되는 노이즈 비율입니다. 값은 0.0에서 1.0 사이입니다.)  
+  타입: double 기본값: 0  
+-sine_write_rate (사인파 쓰기 속도 제한을 사용합니다.)  
+  타입: bool 기본값: false  
+-sine_write_rate_interval_milliseconds (사인파 쓰기 속도 제한을 다시 계산하는 간격(밀리초 단위)입니다.)  
+  타입: uint64 기본값: 10000  
+-skip_list_lookahead (skip_list 메모리 테이블 표현과 함께 사용됩니다. 이전 위치에서 선형 검색을 먼저 시도합니다.)  
+  타입: int32 기본값: 0  
+-slow_usecs (이 마이크로초 이상 걸리는 작업에 대해 메시지가 출력됩니다.)  
+  타입: uint64 기본값: 1000000  
+-soft_pending_compaction_bytes_limit (대기 중인 압축 바이트가 이 숫자를 초과하면 쓰기를 느리게 만듭니다.)  
+  타입: uint64 기본값: 68719476736  
+-statistics (데이터베이스 통계입니다.)  
+  타입: bool 기본값: false  
+-statistics_string (직렬화된 통계 문자열입니다.)  
+  타입: string 기본값: ""  
+-stats_dump_period_sec (로그에 통계를 출력하는 간격(초 단위)입니다.)  
+  타입: uint64 기본값: 600  
+-stats_history_buffer_size (메모리에 유지할 통계 스냅샷의 최대 수입니다.)  
+  타입: uint64 기본값: 1048576  
+-stats_interval (이 값이 0보다 큰 경우, 통계는 N번의 연산마다 보고됩니다. 값이 0일 경우, 간격은 시간이 지남에 따라 증가합니다.)  
+  타입: int64 기본값: 0  
+-stats_interval_seconds (통계를 N초마다 보고합니다. 이 값이 0보다 크고 stats_interval도 0보다 클 경우, 이 설정이 우선합니다.)  
+  타입: int64 기본값: 0  
+-stats_level (통계를 위한 통계 레벨입니다.)  
+  타입: int32 기본값: 3  
+-stats_per_interval (이 값이 0보다 크면, 간격별 추가 통계를 보고합니다.)  
+  타입: int32 기본값: 0  
+-stats_persist_period_sec (통계를 지속적으로 저장하는 간격(초 단위)입니다.)  
+  타입: uint64 기본값: 600  
+-stddev (키를 선택하는 데 사용되는 정규 분포의 표준 편차입니다. (RandomReplaceKeys에서만 사용됩니다.))  
+  타입: double 기본값: 2000  
+-strict_max_successive_merges (`max_successive_merges` 한도를 유지하기 위해 파일 시스템 읽기를 수행할지 여부입니다.)  
+  타입: bool 기본값: false  
+-subcompactions (CompactRange의 경우, 이 CompactRange의 각 압축 작업에 대해 max_subcompactions를 설정합니다. 자동 압축의 경우, L0-L1 압축을 나누는 서브 압축의 최대 개수입니다.)  
+  타입: uint64 기본값: 1  
+-sync (모든 쓰기를 디스크에 동기화합니다.)  
+  타입: bool 기본값: false  
+-table_cache_numshardbits ()  
+  타입: int32 기본값: 4  
+-target_file_size_base (레벨-1에서 목표 파일 크기입니다.)  
+  타입: int64 기본값: 67108864  
+-target_file_size_multiplier (레벨-N(N >= 2) 파일 크기를 계산하는 배수입니다.)  
+  타입: int32 기본값: 1  
+-thread_status_per_interval (이 값이 0보다 크면, 각 스레드의 현재 상태를 스냅샷으로 찍어 보고합니다.)  
+  타입: int32 기본값: 0  
+-threads (실행할 동시 스레드 수입니다.)  
+  타입: int32 기본값: 1  
+-tiered_adm_policy (계층형 캐시에서 보조 캐시의 Admission 정책입니다. 허용 가능한 값: auto, placeholder, allow_cache_hits, three_queue.)  
+  타입: string 기본값: "auto"  
+-time_range (데이터베이스에 저장된 타임스탬프 범위입니다. (TimeSeries에서만 사용됩니다.))  
+  타입: uint64 기본값: 100000  
+-total_order_seek (인덱스 형식에 관계없이 전체 순서 탐색(total order seek)을 활성화합니다.)  
+  타입: bool 기본값: false  
+-trace_file (워크로드를 파일에 기록합니다.)  
+  타입: string 기본값: ""  
+-trace_replay_fast_forward (Trace 재생을 빠르게 진행합니다. 0.0보다 커야 합니다.)  
+  타입: double 기본값: 1  
+-trace_replay_threads (재생할 스레드 수입니다. 1 이상이어야 합니다.)  
+  타입: int32 기본값: 1  
+-track_and_verify_wals_in_manifest (true인 경우, MANIFEST에서 WAL 추적을 활성화합니다.)  
+  타입: bool 기본값: false  
+-transaction_db (TransactionDB 인스턴스를 엽니다. randomtransaction 벤치마크에 필요합니다.)  
+  타입: bool 기본값: false  
+-transaction_lock_timeout (transaction_db를 사용하는 경우, 트랜잭션이 잠금을 대기한 후 실패하기 전의 대기 시간(밀리초)입니다.)  
+  타입: uint64 기본값: 100  
+-transaction_set_snapshot (true로 설정하면 각 트랜잭션이 생성 시 SetSnapshot()을 호출합니다.)  
+  타입: bool 기본값: false  
+-transaction_sets (각 트랜잭션이 수정할 키의 수입니다. (RandomTransaction에서만 사용) 최대값: 9999)  
+  타입: uint64 기본값: 2  
+-transaction_sleep (읽기와 쓰기 사이에 대기하는 최대 시간(마이크로초 단위)입니다. (RandomTransaction에서만 사용))  
+  타입: int32 기본값: 0  
+-truth_db (확인(verify) 시 사용되는 진실 키/값 경로입니다.)  
+  타입: string 기본값: "/dev/shm/truth_db/dbbench"  
+-ttl_seconds (options.ttl을 설정합니다.)  
+  타입: uint64 기본값: 18446744073709551614  
+-uncache_aggressiveness (캐시에서 오래된 항목을 삭제하는 공격성 수준입니다. 0 = 비활성화, 1 = 최소, 100 = 보통, 10000 = 최대)  
+  타입: uint32 기본값: 0  
+-universal_allow_trivial_move (유니버설 압축에서 단순 이동(trivial move)을 허용합니다.)  
+  타입: bool 기본값: false  
+-universal_compression_size_percent (유니버설 압축에서 압축할 데이터베이스 비율(백분율)입니다. -1은 모든 것을 압축함을 의미합니다.)  
+  타입: int32 기본값: -1  
+-universal_incremental (유니버설 압축에서 증분 압축을 활성화합니다.)  
+  타입: bool 기본값: false  
+-universal_max_merge_width (유니버설 스타일 압축에서 병합할 최대 파일 수입니다.)  
+  타입: int32 기본값: 0  
+-universal_max_read_amp (정렬된 실행(run) 수의 제한입니다.)  
+  타입: int32 기본값: -1  
+-universal_max_size_amplification_percent (유니버설 스타일 압축의 최대 크기 증폭입니다.)  
+  타입: int32 기본값: 0  
+-universal_min_merge_width (단일 압축 실행에서 최소 파일 수입니다. (유니버설 압축에서만 사용됩니다.))  
+  타입: int32 기본값: 0  
+-universal_size_ratio (파일 크기를 비교할 때 허용되는 유연성 비율(백분율)입니다. (유니버설 압축에서만 사용됩니다.))  
+  타입: int32 기본값: 0  
+-universal_stop_style (유니버설 압축 중지 스타일입니다.)  
+  타입: int32 기본값: 1  
+-unordered_write (순서가 없는 쓰기 기능을 활성화합니다. 이 기능은 높은 처리량을 제공하지만 원자적 읽기 및 불변 스냅샷에 대한 보장이 완화됩니다.)  
+  타입: bool 기본값: false  
+-use_adaptive_mutex (적응형 뮤텍스를 사용합니다.)  
+  타입: bool 기본값: false  
+-use_blob_cache ([Integrated BlobDB] Blob 캐시를 활성화합니다.)  
+  타입: bool 기본값: false  
+-use_blob_db ([Stacked BlobDB] BlobDB 인스턴스를 엽니다.)  
+  타입: bool 기본값: false  
+-use_cache_jemalloc_no_dump_allocator (block/blob 캐시에 대해 JemallocNodumpAllocator를 사용합니다.)  
+  타입: bool 기본값: false  
+-use_cache_memkind_kmem_allocator (block/blob 캐시에 대해 memkind kmem allocator를 사용합니다.)  
+  타입: bool 기본값: false  
+-use_compressed_secondary_cache (보조 캐시로 CompressedSecondaryCache를 사용합니다.)  
+  타입: bool 기본값: false  
+-use_cuckoo_table (쿠쿠 테이블 형식을 사용할지 여부입니다.)  
+  타입: bool 기본값: false  
+-use_data_block_hash_index (BlockTable을 사용하는 경우, kDataBlockBinarySearch 대신 kDataBlockBinaryAndHash를 사용할지 여부입니다.)  
+  타입: bool 기본값: false  
+-use_direct_io_for_flush_and_compaction (백그라운드 플러시 및 압축 쓰기에 대해 O_DIRECT를 사용합니다.)  
+  타입: bool 기본값: false  
+-use_direct_reads (데이터 읽기에 O_DIRECT를 사용합니다.)  
+  타입: bool 기본값: false  
+-use_existing_db (true일 경우, 기존 데이터베이스를 삭제하지 않습니다. 이 플래그를 설정하고 새 데이터베이스를 요구하는 벤치마크를 지정하면, 해당 벤치마크는 실패합니다.)  
+  타입: bool 기본값: false  
+-use_existing_keys (true일 경우, 새 키를 생성하지 않고 데이터베이스에 있는 기존 키를 사용합니다. 이 플래그를 활성화하려면 `-use_existing_db=true`도 설정해야 하며, 일부 초기화 지연이 발생할 수 있습니다. 이 플래그가 설정되면 `-num` 값은 무시됩니다.)  
+  타입: bool 기본값: false  
+-use_fsync (true인 경우, fdatasync 대신 fsync를 사용합니다.)  
+  타입: bool 기본값: false  
+-use_hash_search (BlockTable을 사용하는 경우, kBinarySearch 대신 kHashSearch를 사용할지 여부입니다.)  
+  타입: bool 기본값: false  
+-use_keep_filter (noop 압축 필터를 사용할지 여부입니다.)  
+  타입: bool 기본값: false  
+-use_plain_table (블록 기반 테이블 형식 대신 plain 테이블을 사용할지 여부입니다.)  
+  타입: bool 기본값: false  
+-use_ribbon_filter (Bloom 필터 대신 Ribbon 필터를 사용할지 여부입니다.)  
+  타입: bool 기본값: false  
+-use_secondary_db (RocksDB 보조 인스턴스를 엽니다. 기본(primary) 인스턴스는 다른 db_bench 프로세스에서 실행될 수 있습니다.)  
+  타입: bool 기본값: false  
+-use_shared_block_and_blob_cache ([Integrated BlobDB] 블록 캐시와 Blob 캐시에 대한 공유 캐시를 사용할지 여부입니다. 이는 use_blob_cache가 활성화된 경우에만 적용됩니다.)  
+  타입: bool 기본값: true  
+-use_single_deletes (Single Delete를 사용합니다. (RandomReplaceKeys에서만 사용됩니다.))  
+  타입: bool 기본값: true  
+-use_stderr_info_logger (정보 로그를 LOG 파일 대신 stderr로 출력합니다.)  
+  타입: bool 기본값: false  
+-use_tailing_iterator (Get 대신 테일링 이터레이터를 사용하여 키 시퀀스에 접근합니다.)  
+  타입: bool 기본값: false  
+-use_tiered_cache (use_compressed_secondary_cache와 use_tiered_volatile_cache가 true로 설정된 경우, 캐시 예약을 두 캐시 간 비례적으로 분배하는 계층형 캐시를 생성합니다.)  
+  타입: bool 기본값: false  
+-use_uint64_comparator (Uint64 사용자 비교기를 사용합니다.)  
+  타입: bool 기본값: false  
+-user_timestamp_size (사용자 정의 타임스탬프의 바이트 수입니다.)  
+  타입: int32 기본값: 0  
+-value_k (일반화된 파레토 분포(Generized Pareto Distribution)의 k 매개변수입니다.  
+  f(x) = (1/sigma) * (1 + k * (x - theta) / sigma)^(-(1/k + 1)))  
+  타입: double 기본값: 0.2615  
+-value_sigma (일반화된 파레토 분포(Generized Pareto Distribution)의 sigma 매개변수입니다.  
+  f(x) = (1/sigma) * (1 + k * (x - theta) / sigma)^(-(1/k + 1)))  
+  타입: double 기본값: 25.45  
+-value_size (고정 분포에서 각 값의 크기입니다.)  
+  타입: int32 기본값: 100  
+-value_size_distribution_type (값 크기 분포 유형입니다. 허용 값: fixed, uniform, normal)  
+  타입: string 기본값: "fixed"  
+-value_size_max (랜덤 값의 최대 크기입니다.)  
+  타입: int32 기본값: 102400  
+-value_size_min (랜덤 값의 최소 크기입니다.)  
+  타입: int32 기본값: 100  
+-value_theta (일반화된 파레토 분포(Generized Pareto Distribution)의 theta 매개변수입니다.  
+  f(x) = (1/sigma) * (1 + k * (x - theta) / sigma)^(-(1/k + 1)))  
+  타입: double 기본값: 0  
+-verify_checksum (스토리지에서 읽은 모든 블록에 대해 체크섬을 검증합니다.)  
+  타입: bool 기본값: true  
+-wal_bytes_per_sync (WAL 파일이 쓰여지는 동안 운영 체제가 WAL 파일을 점진적으로 동기화하도록 허용합니다. wal_bytes_per_sync마다 하나의 요청을 발행합니다. 0은 비활성화합니다.)  
+  타입: uint64 기본값: 0  
+-wal_compression (WAL 압축에 사용할 알고리즘입니다. "none"은 압축을 비활성화합니다.)  
+  타입: string 기본값: "none"  
+-wal_dir (빈 문자열이 아닌 경우, 지정된 디렉터리를 WAL에 사용합니다.)  
+  타입: string 기본값: ""  
+-wal_size_limit_MB (WAL 파일의 크기 제한(MB 단위)입니다.)  
+  타입: uint64 기본값: 0  
+-wal_ttl_seconds (WAL 파일의 TTL(초 단위)입니다.)  
+  타입: uint64 기본값: 0  
+-whole_key_filtering (SST Bloom 필터에서 접두사 외에 전체 키를 사용할지 여부입니다.)  
+  타입: bool 기본값: true  
+-writable_file_max_buffer_size (쓰기 가능한 파일의 최대 쓰기 버퍼 크기입니다.)  
+  타입: int32 기본값: 1048576  
+-write_batch_protection_bytes_per_key (각 쓰기 배치의 키-값당 체크섬 크기입니다. 현재 0과 8만 지원됩니다.)  
+  타입: uint32 기본값: 0  
+-write_buffer_size (압축 전 메모리 테이블(memtable)에 버퍼링할 바이트 수입니다.)  
+  타입: int64 기본값: 67108864  
+-write_thread_max_yield_usec (enable_write_thread_adaptive_yield 작업의 최대 대기 시간(마이크로초 단위)입니다.)  
+  타입: uint64 기본값: 100  
+-write_thread_slow_yield_usec (느린 대기를 통해 다른 프로세스나 스레드가 코어를 원한다고 간주하는 임계값입니다.)  
+  타입: uint64 기본값: 3  
+-writes (수행할 쓰기 작업 수입니다. 음수인 경우 --num 읽기를 수행합니다.)  
+  타입: int64 기본값: -1  
+-writes_before_delete_range (DeleteRange가 정기적으로 호출되기 전의 쓰기 횟수입니다.)  
+  타입: int64 기본값: 0  
+-writes_per_range_tombstone (범위 tombstone 사이의 쓰기 횟수입니다.)  
+  타입: int64 기본값: 0  
