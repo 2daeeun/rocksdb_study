@@ -64,362 +64,380 @@ struct DbPath;
 using FileTypeSet = SmallEnumSet<FileType, FileType::kBlobFile>;
 
 struct ColumnFamilyOptions : public AdvancedColumnFamilyOptions {
-  // 이 함수는 옵션을 이전 버전으로 복구합니다. 4.6 이상 버전만 지원됩니다.
-  // 유지 관리되지 않음: 이 함수는 현재 유지 관리되지 않으며, 앞으로도 유지
-  // 관리되지 않을 예정입니다. 더 이상 사용되지 않음: 이 함수는 향후 릴리스에서
-  // 제거될 수 있습니다. 일반적으로 기본값은 광범위한 관심사를 반영하여
-  // 변경됩니다. 업그레이드 시 변경 사항을 선택하지 않으려면 신중하고 의도적으로
-  // 결정해야 합니다.
-
+  // The function recovers options to a previous version. Only 4.6 or later
+  // versions are supported.
+  // NOT MAINTAINED: This function has not been and is not maintained.
+  // DEPRECATED: This function might be removed in a future release.
+  // In general, defaults are changed to suit broad interests. Opting
+  // out of a change on upgrade should be deliberate and considered.
   ColumnFamilyOptions* OldDefaults(int rocksdb_major_version = 4,
                                    int rocksdb_minor_version = 6);
 
-  // RocksDB 최적화를 더 쉽게 할 수 있는 몇 가지 함수들
-  // DB 크기가 매우 작고 (예: 1GB 미만) memtable에 많은 메모리를 할당하고 싶지
-  // 않다면 이 방법을 사용하세요. 선택적인 캐시 객체가 전달되어 블록 캐시로
-  // 사용됩니다.
-
+  // Some functions that make it easier to optimize RocksDB
+  // Use this if your DB is very small (like under 1GB) and you don't want to
+  // spend lots of memory for memtables.
+  // An optional cache object is passed in to be used as the block cache
   ColumnFamilyOptions* OptimizeForSmallDb(
       std::shared_ptr<Cache>* cache = nullptr);
 
-  // 데이터를 정렬 상태로 유지할 필요가 없으면 이 방법을 사용하세요. 즉,
-  // 이터레이터를 사용하지 않고 Put()과 Get() API 호출만 사용할 경우입니다.
-
+  // Use this if you don't need to keep the data sorted, i.e. you'll never use
+  // an iterator, only Put() and Get() API calls
+  //
   ColumnFamilyOptions* OptimizeForPointLookup(uint64_t block_cache_size_mb);
 
-  // ColumnFamilyOptions의 일부 매개변수에 대한 기본값은 무거운 작업 부하와 큰
-  // 데이터셋에 최적화되어 있지 않으므로 특정 조건에서는 쓰기 지연(write
-  // stalls)이 발생할 수 있습니다. RocksDB 옵션을 조정하기 위한 출발점으로, 다음
-  // 두 함수를 사용하세요:
-  // * OptimizeLevelStyleCompaction -- 레벨 스타일 컴팩션 최적화
-  // * OptimizeUniversalStyleCompaction -- 유니버설 스타일 컴팩션 최적화
-  // 유니버설 스타일 컴팩션은 큰 데이터셋에 대해 쓰기 증폭(Write Amplification)
-  // 계수를 줄이는 데 중점을 두지만, 공간 증폭(Space Amplification)은
-  // 증가시킵니다. 다양한 스타일에 대해 더 알고 싶다면 여기에서 확인할 수
-  // 있습니다:
+  // Default values for some parameters in ColumnFamilyOptions are not
+  // optimized for heavy workloads and big datasets, which means you might
+  // observe write stalls under some conditions. As a starting point for tuning
+  // RocksDB options, use the following two functions:
+  // * OptimizeLevelStyleCompaction -- optimizes level style compaction
+  // * OptimizeUniversalStyleCompaction -- optimizes universal style compaction
+  // Universal style compaction is focused on reducing Write Amplification
+  // Factor for big data sets, but increases Space Amplification. You can learn
+  // more about the different styles here:
   // https://github.com/facebook/rocksdb/wiki/Rocksdb-Architecture-Guide
-  // 또한, 가장 큰 성능 향상을 제공하는 IncreaseParallelism()도 호출해야 합니다.
-  // 참고: 높은 쓰기 속도 기간 동안 memtable_memory_budget보다 더 많은 메모리를
-  // 사용할 수 있습니다.
-
+  // Make sure to also call IncreaseParallelism(), which will provide the
+  // biggest performance gains.
+  // Note: we might use more memory than memtable_memory_budget during high
+  // write rate period
   ColumnFamilyOptions* OptimizeLevelStyleCompaction(
       uint64_t memtable_memory_budget = 512 * 1024 * 1024);
   ColumnFamilyOptions* OptimizeUniversalStyleCompaction(
       uint64_t memtable_memory_budget = 512 * 1024 * 1024);
 
   // -------------------
-  // 동작에 영향을 미치는 매개변수들
+  // Parameters that affect behavior
 
-  // 테이블에서 키의 순서를 정의하는 데 사용되는 비교기(Comparator).
-  // 기본값: 어휘 순서(byte-wise lexicographic ordering)를 사용하는 비교기
+  // Comparator used to define the order of keys in the table.
+  // Default: a comparator that uses lexicographic byte-wise ordering
   //
-  // 요구 사항: 클라이언트는 여기에서 제공된 비교기가 동일한 이름을 사용하고,
-  // 이전 DB 열기 호출에서 제공된 비교기와 *정확히* 동일한 방식으로 키를
-  // 정렬하는지 확인해야 합니다.
+  // REQUIRES: The client must ensure that the comparator supplied
+  // here has the same name and orders keys *exactly* the same as the
+  // comparator provided to previous open calls on the same DB.
   const Comparator* comparator = BytewiseComparator();
 
-  // 요구 사항: Merge 작업에 접근해야 할 경우 클라이언트는 머지 연산자(merge
-  // operator)를 제공해야 합니다. 머지 연산자 없이 DB에서 Merge를 호출하면
-  // Status::NotSupported가 반환됩니다. 클라이언트는 여기에서 제공된 머지
-  // 연산자가 동일한 이름을 사용하고, 이전 DB 열기 호출에서 제공된 머지 연산자와
-  // *정확히* 동일한 의미론적 동작을 수행하는지 확인해야 합니다. 유일한 예외는
-  // 업그레이드 상황으로, 이전에 머지 연산자가 없었던 DB에 처음으로 Merge 작업이
-  // 도입될 때입니다. 이 경우 DB를 열 때 머지 연산자를 지정하는 것이 필요합니다.
-  // 기본값: nullptr
+  // REQUIRES: The client must provide a merge operator if Merge operation
+  // needs to be accessed. Calling Merge on a DB without a merge operator
+  // would result in Status::NotSupported. The client must ensure that the
+  // merge operator supplied here has the same name and *exactly* the same
+  // semantics as the merge operator provided to previous open calls on
+  // the same DB. The only exception is reserved for upgrade, where a DB
+  // previously without a merge operator is introduced to Merge operation
+  // for the first time. It's necessary to specify a merge operator when
+  // opening the DB in this case.
+  // Default: nullptr
   std::shared_ptr<MergeOperator> merge_operator = nullptr;
 
-  // 단일 CompactionFilter 인스턴스를 컴팩션 중에 호출합니다.
-  // 백그라운드 컴팩션 중에 키-값을 수정하거나 삭제할 수 있도록 애플리케이션에
-  // 허용합니다.
+  // A single CompactionFilter instance to call into during compaction.
+  // Allows an application to modify/delete a key-value during background
+  // compaction.
   //
-  // 클라이언트가 서로 다른 컴팩션 실행에 대해 새로운 `CompactionFilter`를
-  // 사용하거나 컴팩션 외부에서 테이블 파일 생성을 위해 `CompactionFilter`가
-  // 필요하면, 이 옵션 대신 compaction_filter_factory를 지정할 수 있습니다. 두
-  // 가지 중 하나만 지정해야 합니다. compaction_filter와
-  // compaction_filter_factory가 모두 지정되면 compaction_filter가 우선됩니다.
+  // If the client requires a new `CompactionFilter` to be used for different
+  // compaction runs and/or requires a `CompactionFilter` for table file
+  // creations outside of compaction, it can specify compaction_filter_factory
+  // instead of this option.  The client should specify only one of the two.
+  // compaction_filter takes precedence over compaction_filter_factory if
+  // client specifies both.
   //
-  // 멀티스레드 컴팩션을 사용하는 경우, 제공된 CompactionFilter 인스턴스는 서로
-  // 다른 스레드에서 동시에 사용될 수 있으므로 스레드 안전해야 합니다.
+  // If multithreaded compaction is being used, the supplied CompactionFilter
+  // instance may be used from different threads concurrently and so should be
+  // thread-safe.
   //
-  // 기본값: nullptr
+  // Default: nullptr
   const CompactionFilter* compaction_filter = nullptr;
 
-  // 이것은 `CompactionFilter` 객체를 제공하는 팩토리로, 애플리케이션이 테이블
-  // 파일 생성 중에 키-값을 수정하거나 삭제할 수 있게 합니다.
+  // This is a factory that provides `CompactionFilter` objects which allow
+  // an application to modify/delete a key-value during table file creation.
   //
-  // `compaction_filter` 옵션과 달리, 이는 컴팩션이 테이블 파일을 생성할 때
-  // 사용되며, 테이블 파일이 여러 이유로 생성될 때 `CompactionFilter`를 사용할
-  // 수 있게 합니다. 이 팩토리는 어떤 `TableFileCreationReason`이
-  // `CompactionFilter`를 사용할지를 결정할 수 있습니다. 호환성을 위해
-  // 기본적으로 이 결정은 `TableFileCreationReason::kCompaction`에 대해서만
-  // `CompactionFilter`를 사용하도록 설정됩니다.
+  // Unlike the `compaction_filter` option, which is used when compaction
+  // creates a table file, this factory allows using a `CompactionFilter` when a
+  // table file is created for various reasons. The factory can decide what
+  // `TableFileCreationReason`s use a `CompactionFilter`. For compatibility, by
+  // default the decision is to use a `CompactionFilter` for
+  // `TableFileCreationReason::kCompaction` only.
   //
-  // 테이블 파일을 생성하는 작업을 담당하는 각 스레드는 위의
-  // `TableFileCreationReason`에 기반한 결정에 따라 `CompactionFilter`를 새로
-  // 생성합니다. 이 방식은 애플리케이션이 각 작업 스레드에 대해 알 수 있게
-  // 해주며, `CompactionFilter`가 스레드 안전성을 제공할 필요가 없도록 합니다.
+  // Each thread of work involving creating table files will create a new
+  // `CompactionFilter` when it will be used according to the above
+  // `TableFileCreationReason`-based decision. This allows the application to
+  // know about the different ongoing threads of work and makes it unnecessary
+  // for `CompactionFilter` to provide thread-safety.
   //
-  // 기본값: nullptr
+  // Default: nullptr
   std::shared_ptr<CompactionFilterFactory> compaction_filter_factory = nullptr;
 
   // -------------------
-  // 성능에 영향을 미치는 매개변수들
+  // Parameters that affect performance
 
-  // 정렬된 디스크 파일로 변환되기 전에 메모리에서 축적되는 데이터 양 (디스크에
-  // 정렬되지 않은 로그로 백업됨).
+  // Amount of data to build up in memory (backed by an unsorted log
+  // on disk) before converting to a sorted on-disk file.
   //
-  // 더 큰 값은 성능을 증가시킵니다, 특히 대량 로드 중에 그렇습니다.
-  // max_write_buffer_number에 지정된 만큼의 쓰기 버퍼가 동시에 메모리에 보유될
-  // 수 있습니다, 따라서 이 매개변수를 조정하여 메모리 사용을 제어할 수
-  // 있습니다. 또한, 더 큰 쓰기 버퍼는 데이터베이스를 다음에 열 때 복구 시간을
-  // 길게 만듭니다.
+  // Larger values increase performance, especially during bulk loads.
+  // Up to max_write_buffer_number write buffers may be held in memory
+  // at the same time,
+  // so you may wish to adjust this parameter to control memory usage.
+  // Also, a larger write buffer will result in a longer recovery time
+  // the next time the database is opened.
   //
-  // write_buffer_size는 컬럼 패밀리별로 적용됩니다.
-  // 컬럼 패밀리 간 메모리 공유를 위해 db_write_buffer_size를 참조하세요.
+  // Note that write_buffer_size is enforced per column family.
+  // See db_write_buffer_size for sharing memory across column families.
   //
-  // 기본값: 64MB
+  // Default: 64MB
   //
-  // SetOptions() API를 통해 동적으로 변경 가능
+  // Dynamically changeable through SetOptions() API
   size_t write_buffer_size = 64 << 20;
 
-  // 지정된 압축 알고리즘을 사용하여 블록을 압축합니다.
+  // Compress blocks using the specified compression algorithm.
   //
-  // 기본값: kSnappyCompression, 지원되는 경우. Snappy가 라이브러리와 연결되지
-  // 않은 경우, 기본값은 kNoCompression입니다.
+  // Default: kSnappyCompression, if it's supported. If snappy is not linked
+  // with the library, the default is kNoCompression.
   //
-  // Intel(R) Core(TM)2 2.4GHz에서의 kSnappyCompression의 일반적인 속도:
-  //    ~200-500MB/s 압축
-  //    ~400-800MB/s 압축 해제
+  // Typical speeds of kSnappyCompression on an Intel(R) Core(TM)2 2.4GHz:
+  //    ~200-500MB/s compression
+  //    ~400-800MB/s decompression
   //
-  // 이 속도는 대부분의 지속적인 저장 장치 속도보다 훨씬 빠르므로
-  // 일반적으로 kNoCompression으로 전환할 필요는 없습니다.
-  // 입력 데이터가 압축할 수 없는 경우에도, kSnappyCompression 구현은 이를
-  // 효율적으로 감지하고 압축되지 않은 모드로 전환합니다.
+  // Note that these speeds are significantly faster than most
+  // persistent storage speeds, and therefore it is typically never
+  // worth switching to kNoCompression.  Even if the input data is
+  // incompressible, the kSnappyCompression implementation will
+  // efficiently detect that and will switch to uncompressed mode.
   //
-  // `compression_opts.level`을 설정하지 않거나
-  // `CompressionOptions::kDefaultCompressionLevel`로 설정하면, 우리는 아래와
-  // 같이 `compression`에 해당하는 기본값을 선택하려고 시도합니다:
+  // If you do not set `compression_opts.level`, or set it to
+  // `CompressionOptions::kDefaultCompressionLevel`, we will attempt to pick the
+  // default corresponding to `compression` as follows:
   //
   // - kZSTD: 3
-  // - kZlibCompression: Z_DEFAULT_COMPRESSION (현재 -1)
+  // - kZlibCompression: Z_DEFAULT_COMPRESSION (currently -1)
   // - kLZ4HCCompression: 0
-  // - kLZ4: -1 (즉, `acceleration=1`; `CompressionOptions::level` 문서 참조)
-  // - 나머지 모든 경우, 압축 수준을 지정하지 않습니다.
+  // - kLZ4: -1 (i.e., `acceleration=1`; see `CompressionOptions::level` doc)
+  // - For all others, we do not specify a compression level
   //
-  // SetOptions() API를 통해 동적으로 변경 가능
+  // Dynamically changeable through SetOptions() API
   CompressionType compression;
 
-  // 파일을 포함하는 가장 하위 레벨에 대해 사용될 압축 알고리즘.
-  // num_levels = 1에 대한 동작은 명확하게 정의되지 않았습니다.
-  // 현재 num_levels = 1일 경우, 모든 컴팩션 출력은 bottommost_compression을
-  // 사용하고 모든 플러시 출력은 여전히 options.compression을 사용하지만, 이
-  // 동작은 변경될 수 있습니다.
+  // Compression algorithm that will be used for the bottommost level that
+  // contain files. The behavior for num_levels = 1 is not well defined.
+  // Right now, with num_levels = 1,  all compaction outputs will use
+  // bottommost_compression and all flush outputs still use options.compression,
+  // but the behavior is subject to change.
   //
-  // 기본값: kDisableCompressionOption (비활성화)
+  // Default: kDisableCompressionOption (Disabled)
   CompressionType bottommost_compression = kDisableCompressionOption;
 
-  // bottommost_compression에서 사용되는 압축 알고리즘에 대한 다양한 옵션들.
-  // 이를 활성화하려면 CompressionOptions의 정의를 참조하세요.
-  // num_levels = 1에 대한 동작은 options.bottommost_compression과 동일합니다.
+  // different options for compression algorithms used by bottommost_compression
+  // if it is enabled. To enable it, please see the definition of
+  // CompressionOptions. Behavior for num_levels = 1 is the same as
+  // options.bottommost_compression.
   CompressionOptions bottommost_compression_opts;
 
-  // 압축 알고리즘에 대한 다양한 옵션들
+  // different options for compression algorithms
   CompressionOptions compression_opts;
 
-  // level-0 컴팩션을 트리거할 파일 수. 값이 <0이면
-  // level-0 컴팩션은 파일 수에 의해 전혀 트리거되지 않습니다.
+  // Number of files to trigger level-0 compaction. A value <0 means that
+  // level-0 compaction will not be triggered by number of files at all.
   //
-  // 유니버설 컴팩션: RocksDB는 정렬된 실행(run)의 수가 이 숫자를 초과하지
-  // 않도록 하려고 시도합니다.
-  //   CompactionOptionsUniversal::max_read_amp가 설정되면, 이 옵션은 컴팩션을
-  //   찾기 위한 트리거로만 사용됩니다.
-  //   CompactionOptionsUniversal::max_read_amp는 정렬된 실행의 수에 대한 제한이
-  //   됩니다.
+  // Universal compaction: RocksDB will try to keep the number of sorted runs
+  //   no more than this number. If CompactionOptionsUniversal::max_read_amp is
+  //   set, then this option will be used only as a trigger to look for
+  //   compaction. CompactionOptionsUniversal::max_read_amp will be the limit
+  //   on the number of sorted runs.
   //
-  // 기본값: 4
+  // Default: 4
   //
-  // SetOptions() API를 통해 동적으로 변경 가능
+  // Dynamically changeable through SetOptions() API
   int level0_file_num_compaction_trigger = 4;
 
-  // nullptr이 아닌 경우, 지정된 함수를 사용하여 키를 "접두어(prefix)"라고
-  // 불리는 연속적인 그룹에 배치합니다. 이 접두어들은 각 키의 항목 대신 그룹의
-  // 대표 항목 하나를 Bloom 필터에 넣는 데 사용됩니다 (전체 키 필터링을 참조).
-  // 특정 조건 하에서, 이는 일부 범위 쿼리(이터레이터)와 일부 포인트
-  // 조회(Get/MultiGet)를 최적화할 수 있게 해줍니다.
+  // If non-nullptr, use the specified function to put keys in contiguous
+  // groups called "prefixes". These prefixes are used to place one
+  // representative entry for the group into the Bloom filter
+  // rather than an entry for each key (see whole_key_filtering).
+  // Under certain conditions, this enables optimizing some range queries
+  // (Iterators) in addition to some point lookups (Get/MultiGet).
   //
-  // `prefix_extractor`와 `comparator`는 범위 쿼리에 대해 유효한 접두어 필터링을
-  // 위해 반드시 다음과 같은 중요한 속성을 만족해야 합니다:
-  //   Compare(k1, k2) <= 0이고 Compare(k2, k3) <= 0이며
-  //      InDomain(k1)이고 InDomain(k3)이고 prefix(k1) == prefix(k3)일 때,
-  //   그러면 InDomain(k2)이고 prefix(k2) == prefix(k1)
+  // Together `prefix_extractor` and `comparator` must satisfy one essential
+  // property for valid prefix filtering of range queries:
+  //   If Compare(k1, k2) <= 0 and Compare(k2, k3) <= 0 and
+  //      InDomain(k1) and InDomain(k3) and prefix(k1) == prefix(k3),
+  //   Then InDomain(k2) and prefix(k2) == prefix(k1)
   //
-  // 다시 말해, 동일한 접두어를 가진 모든 키는 비교기 순서에 따라 연속적인
-  // 그룹에 있어야 하며, 접두어가 없는 키("도메인 밖의 키")에 의해 방해받지
-  // 않아야 합니다. (이 속성 덕분에, 상한 및 하한이 공통의 접두어를 가지며, 그
-  // 접두어를 가진 항목이 없으면 해당 범위 내에 항목이 없다고 결론지을 수
-  // 있습니다.)
+  // In other words, all keys with the same prefix must be in a contiguous
+  // group by comparator order, and cannot be interrupted by keys with no
+  // prefix ("out of domain"). (This makes it valid to conclude that no
+  // entries within some bounds are present if the upper and lower bounds
+  // have a common prefix and no entries with that same prefix are present.)
   //
-  // 몇 가지 다른 속성들도 추천되지만 필수적인 것은 아닙니다. 대부분의 합리적인
-  // 비교기 하에서, 위의 중요한 속성을 만족하려면 다음 조건이 충족되어야 합니다:
-  // * "접두어는 접두어이다": key.starts_with(prefix(key))
-  // * "접두어는 순서를 유지한다": Compare(k1, k2) <= 0이면,
-  //   Compare(prefix(k1), prefix(k2)) <= 0이어야 한다
+  // Some other properties are recommended but not strictly required. Under
+  // most sensible comparators, the following will need to hold true to
+  // satisfy the essential property above:
+  // * "Prefix is a prefix": key.starts_with(prefix(key))
+  // * "Prefixes preserve ordering": If Compare(k1, k2) <= 0, then
+  //   Compare(prefix(k1), prefix(k2)) <= 0
   //
-  // 다음 두 속성은 접두어로 검색할 때 해당 접두어를 가진 모든 항목을 열거할 수
-  // 있도록 보장합니다:
-  // * "접두어는 그룹을 시작한다": Compare(prefix(key), key) <= 0
-  // * "접두어는 항등적이다": prefix(prefix(key)) == prefix(key)
+  // The next two properties ensure that seeking to a prefix allows
+  // enumerating all entries with that prefix:
+  // * "Prefix starts the group": Compare(prefix(key), key) <= 0
+  // * "Prefix idempotent": prefix(prefix(key)) == prefix(key)
   //
-  // 기본값: nullptr
+  // Default: nullptr
   std::shared_ptr<const SliceTransform> prefix_extractor = nullptr;
 
-  // 레벨에 대한 최대 총 데이터 크기를 제어합니다.
-  // max_bytes_for_level_base는 level-1의 최대 총 크기입니다.
-  // 레벨 L에 대한 최대 바이트 수는 다음과 같이 계산할 수 있습니다:
+  // Control maximum total data size for a level.
+  // max_bytes_for_level_base is the max total for level-1.
+  // Maximum number of bytes for level L can be calculated as
   // (max_bytes_for_level_base) * (max_bytes_for_level_multiplier ^ (L-1))
-  // 예를 들어, max_bytes_for_level_base가 200MB이고,
-  // max_bytes_for_level_multiplier가 10이면, level-1의 총 데이터 크기는 200MB,
-  // level-2의 총 파일 크기는 2GB, level-3의 총 파일 크기는 20GB가 됩니다.
+  // For example, if max_bytes_for_level_base is 200MB, and if
+  // max_bytes_for_level_multiplier is 10, total data size for level-1
+  // will be 200MB, total file size for level-2 will be 2GB,
+  // and total file size for level-3 will be 20GB.
   //
-  // 기본값: 256MB.
+  // Default: 256MB.
   //
-  // SetOptions() API를 통해 동적으로 변경 가능
+  // Dynamically changeable through SetOptions() API
   uint64_t max_bytes_for_level_base = 256 * 1048576;
 
-  // 더 이상 사용되지 않음.
+  // Deprecated.
   uint64_t snap_refresh_nanos = 0;
 
-  // 자동 컴팩션을 비활성화합니다. 이 컬럼 패밀리에서는 여전히 수동 컴팩션을
-  // 실행할 수 있습니다.
+  // Disable automatic compactions. Manual compactions can still
+  // be issued on this column family
   //
-  // SetOptions() API를 통해 동적으로 변경 가능
+  // Dynamically changeable through SetOptions() API
   bool disable_auto_compactions = false;
 
-  // 이것은 TableFactory 객체를 제공하는 팩토리입니다.
-  // 기본값: 기본적인 BlockBasedTableOptions를 사용하여 TableBuilder와
-  // TableReader의 기본 구현을 제공하는 블록 기반 테이블 팩토리입니다.
+  // This is a factory that provides TableFactory objects.
+  // Default: a block-based table factory that provides a default
+  // implementation of TableBuilder and TableReader with default
+  // BlockBasedTableOptions.
   std::shared_ptr<TableFactory> table_factory;
 
-  // 이 컬럼 패밀리의 SST 파일을 넣을 수 있는 경로 목록과 해당 경로의 대상
-  // 크기입니다. db_paths와 유사하게, 새로운 데이터는 벡터의 앞부분에 지정된
-  // 경로에 배치되며, 오래된 데이터는 점차 벡터 뒤쪽에 지정된 경로로 이동합니다.
-  // 참고로, 만약 경로가 여러 컬럼 패밀리에 제공되면, 해당 경로에는 모든 컬럼
-  // 패밀리의 파일과 총 크기가 합쳐져 있게 됩니다. 이런 경우에는 사용자 측에서
-  // 모든 컬럼 패밀리의 총 크기를 고려하여 용량을 준비해야 합니다.
+  // A list of paths where SST files for this column family
+  // can be put into, with its target size. Similar to db_paths,
+  // newer data is placed into paths specified earlier in the
+  // vector while older data gradually moves to paths specified
+  // later in the vector.
+  // Note that, if a path is supplied to multiple column
+  // families, it would have files and total size from all
+  // the column families combined. User should provision for the
+  // total size(from all the column families) in such cases.
   //
-  // 비어 있을 경우, db_paths가 사용됩니다.
-  // 기본값: 비어 있음
+  // If left empty, db_paths will be used.
+  // Default: empty
   std::vector<DbPath> cf_paths;
 
-  // 컬럼 패밀리의 컴팩션 동시 스레드 제한기.
-  // nullptr이 아닌 경우, 주어진 동시 스레드 제한기를 사용하여 최대 동시 컴팩션
-  // 작업을 제어합니다. 제한기는 여러 컬럼 패밀리에서 db 인스턴스 간에 공유할 수
-  // 있습니다.
+  // Compaction concurrent thread limiter for the column family.
+  // If non-nullptr, use given concurrent thread limiter to control
+  // the max outstanding compaction tasks. Limiter can be shared with
+  // multiple column families across db instances.
   //
-  // 기본값: nullptr
+  // Default: nullptr
   std::shared_ptr<ConcurrentTaskLimiter> compaction_thread_limiter = nullptr;
 
-  // nullptr이 아닌 경우, 지정된 팩토리를 사용하여 sst 파일의 파티셔닝을
-  // 결정하는 함수를 제공합니다. 이는 컴팩션이 흥미로운 경계(키 접두어)에서
-  // 파일을 분할하여 SST 파일의 전파가 더 적은 쓰기 증폭을 일으키도록 돕습니다
-  // (전체 키 공간을 덮지 않도록).
-  // 이 기능은 아직 실험적입니다.
+  // If non-nullptr, use the specified factory for a function to determine the
+  // partitioning of sst files. This helps compaction to split the files
+  // on interesting boundaries (key prefixes) to make propagation of sst
+  // files less write amplifying (covering the whole key space).
+  // THE FEATURE IS STILL EXPERIMENTAL
   //
-  // 기본값: nullptr
+  // Default: nullptr
   std::shared_ptr<SstPartitionerFactory> sst_partitioner_factory = nullptr;
 
-  // RocksDB는 범위 삭제 수가 이 한계값 이상일 때 현재 memtable을 플러시하려고
-  // 시도합니다. 많은 범위 삭제가 있는 작업 부하에서는, memtable에서 범위 삭제의
-  // 수를 제한하는 것이 성능 저하 및/또는 하나의 memtable에 너무 많은 범위
-  // tombstone이 포함되어 발생할 수 있는 OOM을 방지하는 데 도움이 될 수
-  // 있습니다.
+  // RocksDB will try to flush the current memtable after the number of range
+  // deletions is >= this limit. For workloads with many range
+  // deletions, limiting the number of range deletions in memtable can help
+  // prevent performance degradation and/or OOM caused by too many range
+  // tombstones in a single memtable.
   //
-  // 기본값: 0 (비활성화)
+  // Default: 0 (disabled)
   //
-  // SetOptions() API를 통해 동적으로 변경 가능
+  // Dynamically changeable through SetOptions() API
   uint32_t memtable_max_range_deletions = 0;
 
-  // 실험적(EXPERIMENTAL)
-  // 값이 0보다 크면, RocksDB는 삭제될 예정인 파일에 대해 일부 블록 캐시 항목을
-  // 지우려고 시도합니다. 과도한 추적을 피하기 위해, 이 "언캐싱" 프로세스는
-  // 반복적이고 추측적이며, 파일의 블록이 일반적으로 캐시되지 않는 경우
-  // 백그라운드에서 추가적인 CPU 작업이 발생할 수 있습니다. 더 큰 숫자는 알려진
-  // 구식 항목을 지워 블록 캐시 적중률을 최대화하기 위해 CPU 시간을 더 많이
-  // 할애하려는 의지를 나타냅니다.
+  // EXPERIMENTAL
+  // When > 0, RocksDB attempts to erase some block cache entries for files
+  // that have become obsolete, which means they are about to be deleted.
+  // To avoid excessive tracking, this "uncaching" process is iterative and
+  // speculative, meaning it could incur extra background CPU effort if the
+  // file's blocks are generally not cached. A larger number indicates more
+  // willingness to spend CPU time to maximize block cache hit rates by
+  // erasing known-obsolete entries.
   //
-  // uncache_aggressiveness=1일 때, 구식 파일의 블록 캐시 항목은
-  // 블록이 캐시되지 않아서 삭제 시도가 실패할 때까지만 지워집니다.
-  // 그 후, 해당 파일에 대해 캐시된 블록을 삭제하려는 추가적인 시도는 하지
-  // 않습니다.
+  // When uncache_aggressiveness=1, block cache entries for an obsolete file
+  // are only erased until any attempted erase operation fails because the
+  // block is not cached. Then no further attempts are made to erase cached
+  // blocks for that file.
   //
-  // 더 큰 값일 경우, 삭제 시도는 성공 가능성이 < 0.99^(a-1)로 나타날 때까지
-  // 계속 시도됩니다. 여기서 a는 uncache_aggressiveness입니다. 예를 들어: 2 ->
-  // 99% 이상의 성공적인/유용한 삭제를 기대하며 시도 11 -> 90% 69 -> 50% 110 ->
-  // 33% 230 -> 10% 460 -> 1% 690 -> 0.1% 1000 -> 1 in 23000 10000 -> 항상
-  // (실용적인 측면에서) 주의: UINT32_MAX와 그 근처 값은 미래에 추가적인 특별한
-  // 의미를 가질 수 있습니다.
+  // For larger values, erasure is attempted until evidence incidates that the
+  // chance of success is < 0.99^(a-1), where a = uncache_aggressiveness. For
+  // example:
+  // 2 -> Attempt only while expecting >= 99% successful/useful erasure
+  // 11 -> 90%
+  // 69 -> 50%
+  // 110 -> 33%
+  // 230 -> 10%
+  // 460 -> 1%
+  // 690 -> 0.1%
+  // 1000 -> 1 in 23000
+  // 10000 -> Always (for all practical purposes)
+  // NOTE: UINT32_MAX and nearby values could take additional special meanings
+  // in the future.
   //
-  // 고정된 캐시 항목(항상 존재하는 항목)은 uncache_aggressiveness > 0일 경우
-  // 항상 삭제되지만, 비고정 항목의 삭제 성공 확률을 예측하는 데는 사용되지
-  // 않습니다.
+  // Pinned cache entries (guaranteed present) are always erased if
+  // uncache_aggressiveness > 0, but are not used in predicting the chances of
+  // successful erasure of non-pinned entries.
   //
-  // 주의: 체크포인트와 같은 복사된 DB들이 블록 캐시를 공유하는 경우,
-  // 파일이 구식이 되더라도 해당 파일의 블록 캐시 항목(복사본들 간에 공유됨)이
-  // 구식이 아닐 수 있습니다. 이런 시나리오는 uncache_aggressiveness = 0일 때
-  // 가장 적합합니다.
+  // NOTE: In the case of copied DBs (such as Checkpoints) sharing a block
+  // cache, it is possible that a file becoming obsolete doesn't mean its
+  // block cache entries (shared among copies) are obsolete. Such a scenerio
+  // is the best case for uncache_aggressiveness = 0.
   //
-  // allow_mmap_reads=true일 경우, 이 옵션은 무시됩니다(언캐싱 없음).
+  // When using allow_mmap_reads=true, this option is ignored (no un-caching).
   //
-  // 생산 환경에서 검증되면 기본값은 300 정도로 변경될 가능성이 큽니다.
+  // Once validated in production, the default will likely change to something
+  // around 300.
   uint32_t uncache_aggressiveness = 0;
 
-  // 모든 필드에 대한 기본값으로 ColumnFamilyOptions를 생성합니다.
+  // Create ColumnFamilyOptions with default values for all fields
   ColumnFamilyOptions();
-  // Options로부터 ColumnFamilyOptions를 생성합니다.
+  // Create ColumnFamilyOptions from Options
   explicit ColumnFamilyOptions(const Options& options);
 
   void Dump(Logger* log) const;
 };
 
 enum class WALRecoveryMode : char {
-  // 원래의 levelDB 복구
+  // Original levelDB recovery
   //
-  // 로그의 마지막 레코드가 쓰기 중에 충돌로 인해 불완전한 경우를 허용합니다.
-  // 또한, 로그의 후속 데이터에서 미리 할당된 0 바이트도 허용됩니다.
+  // We tolerate the last record in any log to be incomplete due to a crash
+  // while writing it. Zeroed bytes from preallocation are also tolerated in the
+  // trailing data of any log.
   //
-  // 사용 사례: 업데이트가 적용된 후, 충돌 복구 후에도 롤백되지 않아야 하는
-  // 애플리케이션.
-  // 이 복구 모드에서는 `WritableFile::Append()` 쓰기가 내구성을 보장하는 한,
-  // RocksDB가 이를 보장합니다.
-  // 사용자가 더 많은 상황에서 이 보장을 원할 경우(예:
-  // `WritableFile::Append()`가 페이지 캐시로 쓰지만,
-  // 전원 손실 복구 시에도 이 보장을 원할 경우), RocksDB는 추가적으로
-  // `WritableFile::Sync()`를 호출하여
-  // 보장을 강화할 수 있는 다양한 메커니즘을 제공합니다.
+  // Use case: Applications for which updates, once applied, must not be rolled
+  // back even after a crash-recovery. In this recovery mode, RocksDB guarantees
+  // this as long as `WritableFile::Append()` writes are durable. In case the
+  // user needs the guarantee in more situations (e.g., when
+  // `WritableFile::Append()` writes to page cache, but the user desires this
+  // guarantee in face of power-loss crash-recovery), RocksDB offers various
+  // mechanisms to additionally invoke `WritableFile::Sync()` in order to
+  // strengthen the guarantee.
   //
-  // 이 모드는 `kPointInTimeRecovery`와 다릅니다. 복구 중에 손상이 감지되면, 이
-  // 모드는 DB를 열지 않으려고 합니다.
-  // 반면, `kPointInTimeRecovery`는 손상 직전에 복구를 중지하는데, 이는 복구할
-  // 수 있는 유효한 시점입니다.
+  // This differs from `kPointInTimeRecovery` in that, in case a corruption is
+  // detected during recovery, this mode will refuse to open the DB. Whereas,
+  // `kPointInTimeRecovery` will stop recovery just before the corruption since
+  // that is a valid point-in-time to which to recover.
   kTolerateCorruptedTailRecords = 0x00,
-
-  // 깨끗한 종료에서 복구
-  // WAL에서 어떤 손상도 발견되지 않을 것으로 예상합니다.
-  // 사용 사례: 유닛 테스트와 높은 일관성 보장이 필요한 드문 애플리케이션에
-  // 이상적입니다.
+  // Recover from clean shutdown
+  // We don't expect to find any corruption in the WAL
+  // Use case : This is ideal for unit tests and rare applications that
+  // can require high consistency guarantee
   kAbsoluteConsistency = 0x01,
-
-  // 시점 일관성 복구 (기본값)
-  // WAL 불일치가 발견되면 WAL 재생을 중지합니다.
-  // 사용 사례: 하드 디스크, SSD와 같은 디스크 컨트롤러 캐시가 있는 시스템에
-  // 이상적입니다.
-  // 슈퍼 커패시터 없이 관련 데이터를 저장하는 시스템에 적합합니다.
+  // Recover to point-in-time consistency (default)
+  // We stop the WAL playback on discovering WAL inconsistency
+  // Use case : Ideal for systems that have disk controller cache like
+  // hard disk, SSD without super capacitor that store related data
   kPointInTimeRecovery = 0x02,
-
-  // 재난 후 복구
-  // WAL에서 어떤 손상도 무시하고 가능한 한 많은 데이터를 복구하려고 시도합니다.
-  // 사용 사례: 데이터를 복구하려는 마지막 시도에 이상적이거나,
-  // 낮은 품질의 관련 없는 데이터를 처리하는 시스템에 적합합니다.
+  // Recovery after a disaster
+  // We ignore any corruption in the WAL and try to salvage as much data as
+  // possible
+  // Use case : Ideal for last ditch effort to recover data or systems that
+  // operate with low grade unrelated data
   kSkipAnyCorruptedRecords = 0x03,
 };
 
@@ -443,14 +461,14 @@ struct CompactionServiceJobInfo {
   std::string db_name;
   std::string db_id;
   std::string db_session_id;
-  uint64_t job_id;  // job_id는 현재 DB와 세션 내에서만 고유합니다.
-                    // DB를 다시 시작하면 job_id가 리셋됩니다. `db_id`와
-                    // `db_session_id`는 서로 다른 DB와 세션에서 고유한 ID를
-                    // 생성하는 데 도움이 될 수 있습니다.
+  uint64_t job_id;  // job_id is only unique within the current DB and session,
+                    // restart DB will reset the job_id. `db_id` and
+                    // `db_session_id` could help you build unique id across
+                    // different DBs and sessions.
 
   Env::Priority priority;
 
-  // 컴팩션 서비스에서 유용할 수 있는 추가 컴팩션 세부 사항
+  // Additional Compaction Details that can be useful in the CompactionService
   CompactionReason compaction_reason;
   bool is_full_compaction;
   bool is_manual_compaction;
@@ -474,9 +492,8 @@ struct CompactionServiceJobInfo {
 };
 
 struct CompactionServiceScheduleResponse {
-  std::string scheduled_job_id;  // primary 호스트 외부에서 생성된 job_id, 서로
-                                 // 다른 DB와 세션 간에 고유 DB가 재시작되면
-                                 // job_id가 리셋됩니다.
+  std::string scheduled_job_id;  // Generated outside of primary host, unique
+                                 // across different DBs and sessions
   CompactionServiceJobStatus status;
   CompactionServiceScheduleResponse(std::string scheduled_job_id_,
                                     CompactionServiceJobStatus status_)
@@ -485,19 +502,17 @@ struct CompactionServiceScheduleResponse {
       : status(status_) {}
 };
 
-// 예외는 RocksDB로 전달되지 않도록 해야 합니다,
-// RocksDB는 예외 안전성이 보장되지 않기 때문입니다.
-// 이로 인해 정의되지 않은 동작이 발생할 수 있으며,
-// 데이터 손실, 보고되지 않은 손상, 교착 상태 등 여러 가지 문제가 발생할 수
-// 있습니다.
+// Exceptions MUST NOT propagate out of overridden functions into RocksDB,
+// because RocksDB is not exception-safe. This could cause undefined behavior
+// including data loss, unreported corruption, deadlocks, and more.
 class CompactionService : public Customizable {
  public:
   static const char* Type() { return "CompactionService"; }
 
-  // 이 컴팩션 서비스의 이름을 반환합니다.
+  // Returns the name of this compaction service.
   const char* Name() const override = 0;
 
-  // 원격에서 처리될 컴팩션을 예약합니다.
+  // Schedule compaction to be processed remotely.
   virtual CompactionServiceScheduleResponse Schedule(
       const CompactionServiceJobInfo& /*info*/,
       const std::string& /*compaction_service_input*/) {
@@ -506,30 +521,29 @@ class CompactionService : public Customizable {
     return response;
   }
 
-  // 원격 작업자가 예약된 컴팩션이 완료될 때까지 대기합니다.
+  // Wait for the scheduled compaction to finish from the remote worker
   virtual CompactionServiceJobStatus Wait(
       const std::string& /*scheduled_job_id*/, std::string* /*result*/) {
     return CompactionServiceJobStatus::kUseLocal;
   }
 
-  // 설치 시 선택적으로 호출되는 콜백 함수입니다.
+  // Optional callback function upon Installation.
   virtual void OnInstallation(const std::string& /*scheduled_job_id*/,
                               CompactionServiceJobStatus /*status*/) {}
 
-  // 더 이상 사용되지 않음. 원격 컴팩션을 처리하려면 Schedule()과 Wait() API를
-  // 구현하십시오.
+  // Deprecated. Please implement Schedule() and Wait() API to handle remote
+  // compaction
 
-  // `compaction_service_input`을 사용하여 원격에서 컴팩션을 시작합니다.
-  // 이 입력은 원격 측에서 `DB::OpenAndCompact()`에 전달될 수 있습니다.
-  // `info`는 사용자가 알고 싶어할 정보를 제공합니다. 여기에는 `job_id`가
-  // 포함됩니다.
+  // Start the remote compaction with `compaction_service_input`, which can be
+  // passed to `DB::OpenAndCompact()` on the remote side. `info` provides the
+  // information the user might want to know, which includes `job_id`.
   virtual CompactionServiceJobStatus StartV2(
       const CompactionServiceJobInfo& /*info*/,
       const std::string& /*compaction_service_input*/) {
     return CompactionServiceJobStatus::kUseLocal;
   }
 
-  // 원격 컴팩션이 완료될 때까지 대기합니다.
+  // Wait for remote compaction to finish.
   virtual CompactionServiceJobStatus WaitForCompleteV2(
       const CompactionServiceJobInfo& /*info*/,
       std::string* /*compaction_service_result*/) {
@@ -540,998 +554,1093 @@ class CompactionService : public Customizable {
 };
 
 struct DBOptions {
-  // 이 함수는 옵션을 버전 4.6의 옵션으로 복구합니다.
-  // 유지 관리되지 않음: 이 함수는 유지 관리되지 않으며 앞으로도 유지 관리되지
-  // 않을 예정입니다. 더 이상 사용되지 않음: 이 함수는 향후 릴리스에서 제거될 수
-  // 있습니다. 일반적으로 기본값은 광범위한 관심사를 반영하여 변경됩니다.
-  // 업그레이드 시 변경 사항을 선택하지 않으려면 신중하고 의도적으로 결정해야
-  // 합니다.
+  // The function recovers options to the option as in version 4.6.
+  // NOT MAINTAINED: This function has not been and is not maintained.
+  // DEPRECATED: This function might be removed in a future release.
+  // In general, defaults are changed to suit broad interests. Opting
+  // out of a change on upgrade should be deliberate and considered.
   DBOptions* OldDefaults(int rocksdb_major_version = 4,
                          int rocksdb_minor_version = 6);
 
-  // RocksDB 최적화를 더 쉽게 할 수 있는 몇 가지 함수들
+  // Some functions that make it easier to optimize RocksDB
 
-  // DB 크기가 매우 작고 (예: 1GB 미만) memtable에 많은 메모리를 할당하고 싶지
-  // 않다면 이 방법을 사용하세요. 선택적인 캐시 객체가 전달되어 memtable의
-  // 메모리 비용에 사용됩니다.
+  // Use this if your DB is very small (like under 1GB) and you don't want to
+  // spend lots of memory for memtables.
+  // An optional cache object is passed in for the memory of the
+  // memtable to cost to
   DBOptions* OptimizeForSmallDb(std::shared_ptr<Cache>* cache = nullptr);
 
-  // 기본적으로 RocksDB는 flush와 컴팩션에 하나의 백그라운드 스레드만
-  // 사용합니다. 이 함수를 호출하면 `total_threads`의 총 스레드를 사용하도록
-  // 설정됩니다. `total_threads`에 대한 좋은 값은 코어 수입니다. 시스템이
-  // RocksDB에 의해 병목 현상이 발생하는 경우 이 함수를 호출하는 것이 거의
-  // 확실히 좋습니다.
+  // By default, RocksDB uses only one background thread for flush and
+  // compaction. Calling this function will set it up such that total of
+  // `total_threads` is used. Good value for `total_threads` is the number of
+  // cores. You almost definitely want to call this function if your system is
+  // bottlenecked by RocksDB.
   DBOptions* IncreaseParallelism(int total_threads = 16);
 
-  // true인 경우, 데이터베이스가 없으면 새로 생성됩니다.
-  // 기본값: false
+  // If true, the database will be created if it is missing.
+  // Default: false
   bool create_if_missing = false;
 
-  // true인 경우, DB::Open()에서 누락된 컬럼 패밀리가 자동으로 생성됩니다.
-  // 기본값: false
+  // If true, missing column families will be automatically created on
+  // DB::Open().
+  // Default: false
   bool create_missing_column_families = false;
 
-  // true인 경우, 데이터베이스가 이미 존재하면 오류가 발생합니다.
-  // 기본값: false
+  // If true, an error is raised if the database already exists.
+  // Default: false
   bool error_if_exists = false;
 
-  // true인 경우, RocksDB는 데이터의 일관성을 적극적으로 검사합니다.
-  // 또한, 데이터베이스에 대한 쓰기 작업(Put, Delete, Merge, Write) 중 하나라도
-  // 실패하면, 데이터베이스는 읽기 전용 모드로 전환되고 다른 모든 쓰기 작업은
-  // 실패합니다. 대부분의 경우 이 값을 true로 설정하는 것이 좋습니다. 기본값:
-  // true
+  // If true, RocksDB will aggressively check consistency of the data.
+  // Also, if any of the  writes to the database fails (Put, Delete, Merge,
+  // Write), the database will switch to read-only mode and fail all other
+  // Write operations.
+  // In most cases you want this to be set to true.
+  // Default: true
   bool paranoid_checks = true;
 
-  // 더 이상 사용되지 않음: 이 옵션은 향후 릴리스에서 제거될 수 있습니다.
+  // DEPRECATED: This option might be removed in a future release.
   //
-  // true인 경우, memtable 플러시 중에 RocksDB는 플러시에서 읽은 총 항목을
-  // 검증하고, 이를 플러시에 삽입된 카운터와 비교합니다.
+  // If true, during memtable flush, RocksDB will validate total entries
+  // read in flush, and compare with counter inserted into it.
   //
-  // 이 옵션은 새로운 검증 기능에 버그가 있는 경우 이를 끄기 위해 제공됩니다.
-  // 이 기능이 안정되면 이 옵션은 향후 제거될 수 있습니다.
+  // The option is here to turn the feature off in case this new validation
+  // feature has a bug. The option may be removed in the future once the
+  // feature is stable.
   //
-  // 기본값: true
+  // Default: true
   bool flush_verify_memtable_count = true;
 
-  // 더 이상 사용되지 않음: 이 옵션은 향후 릴리스에서 제거될 수 있습니다.
+  // DEPRECATED: This option might be removed in a future release.
   //
-  // true인 경우, 컴팩션 중에 RocksDB는 읽은 항목의 수를 세고 이를 컴팩션 입력
-  // 파일의 항목 수와 비교합니다. 이는 컴팩션 중에 손상으로부터 보호를
-  // 추가하려는 목적입니다. 참고 사항:
-  // - compaction 필터가 kRemoveAndSkipUntil을 반환하는 컴팩션에서는 이 검증이
-  // 수행되지 않으며,
-  // - 범위 삭제의 수는 검증되지 않습니다.
+  // If true, during compaction, RocksDB will count the number of entries
+  // read and compare it against the number of entries in the compaction
+  // input files. This is intended to add protection against corruption
+  // during compaction. Note that
+  // - this verification is not done for compactions during which a compaction
+  // filter returns kRemoveAndSkipUntil, and
+  // - the number of range deletions is not verified.
   //
-  // 이 옵션은 새로운 검증 기능에 버그가 있는 경우 이를 끄기 위해 제공됩니다.
-  // 이 기능이 안정되면 이 옵션은 향후 제거될 수 있습니다.
+  // The option is here to turn the feature off in case this new validation
+  // feature has a bug. The option may be removed in the future once the
+  // feature is stable.
   //
-  // 기본값: true
+  // Default: true
   bool compaction_verify_record_count = true;
 
-  // true인 경우, 동기화된 WAL의 로그 번호와 크기가 MANIFEST에 추적됩니다.
-  // DB 복구 중에 동기화된 WAL이 디스크에서 누락되었거나, WAL의 크기가
-  // MANIFEST에 기록된 크기와 일치하지 않으면 오류가 보고되고 복구가 중단됩니다.
+  // If true, the log numbers and sizes of the synced WALs are tracked
+  // in MANIFEST. During DB recovery, if a synced WAL is missing
+  // from disk, or the WAL's size does not match the recorded size in
+  // MANIFEST, an error will be reported and the recovery will be aborted.
   //
-  // 이는 WAL 손상에 대한 추가적인 보호 장치로, per-WAL-entry 체크섬 외에
-  // 제공됩니다.
+  // This is one additional protection against WAL corruption besides the
+  // per-WAL-entry checksum.
   //
-  // 이 옵션은 보조 인스턴스와 함께 작동하지 않습니다.
-  // 현재는 닫힌 WAL만 동기화 추적됩니다. `DB::SyncWAL()`을 호출하거나,
-  // 성능/효율성 이유로 라이브 WAL을 동기화하는 `WriteOptions::sync=true`로 쓰는
-  // 것은 추적되지 않습니다.
+  // Note that this option does not work with secondary instance.
+  // Currently, only syncing closed WALs are tracked. Calling `DB::SyncWAL()`,
+  // etc. or writing with `WriteOptions::sync=true` to sync the live WAL is not
+  // tracked for performance/efficiency reasons.
   //
-  // 기본값: false
+  // Default: false
   bool track_and_verify_wals_in_manifest = false;
 
-  // true인 경우, 매번 SST 파일을 열 때 MANIFEST와 실제 파일 간의 SST 고유 ID를
-  // 검증합니다. 이 검사는 SST 파일이 덮어쓰이거나 잘못 배치되지 않도록
-  // 보장합니다. 불일치가 감지되면 손상 오류가 보고되며, 이는 RocksDB
-  // 버전 7.3부터 MANIFEST에서 고유 ID를 추적하는 경우에만 발생합니다. 추적되는
-  // 내부 고유 ID는 `GetUniqueIdFromTableProperties`에서 반환된 것과 관련이
-  // 있지만, 이는 변경될 수 있습니다. 참고: 검증은 현재 블록 기반 테이블 형식을
-  // 사용하는 SST 파일에서만 수행됩니다.
+  // If true, verifies the SST unique id between MANIFEST and actual file
+  // each time an SST file is opened. This check ensures an SST file is not
+  // overwritten or misplaced. A corruption error will be reported if mismatch
+  // detected, but only when MANIFEST tracks the unique id, which starts from
+  // RocksDB version 7.3. Although the tracked internal unique id is related
+  // to the one returned by GetUniqueIdFromTableProperties, that is subject to
+  // change.
+  // NOTE: verification is currently only done on SST files using block-based
+  // table format.
   //
-  // false로 설정하는 것은 예기치 않은 문제 발생 시에만 필요합니다.
+  // Setting to false should only be needed in case of unexpected problems.
   //
-  // 이 옵션의 초기 버전은 DB::Open에서 모든 SST 파일을 검증하려고 했지만,
-  // 이제는 보장되지 않습니다. 그러나 위 옵션에 문서화된 대로 `max_open_files`가
-  // -1이면 DB는 DB::Open에서 모든 파일을 엽니다.
+  // Although an early version of this option opened all SST files for
+  // verification on DB::Open, that is no longer guaranteed. However, as
+  // documented in an above option, if max_open_files is -1, DB will open all
+  // files on DB::Open().
   //
-  // 기본값: true
+  // Default: true
   bool verify_sst_unique_id_in_manifest = true;
 
-  // 지정된 객체를 사용하여 환경과 상호작용합니다.
-  // 예: 파일을 읽거나 쓸 때, 백그라운드 작업을 예약할 때 등.
-  // 기본값: Env::Default()
+  // Use the specified object to interact with the environment,
+  // e.g. to read/write files, schedule background work, etc.
+  // Default: Env::Default()
   Env* env = Env::Default();
 
-  // 내부 파일 읽기/쓰기 대역폭을 제한합니다:
+  // Limits internal file read/write bandwidth:
   //
-  // - 플러시 요청은 `Env::IOPriority::IO_HIGH`에서 쓰기 대역폭을 사용합니다.
-  // - 컴팩션 요청은 `Env::IOPriority::IO_LOW`에서 읽기 및 쓰기 대역폭을
-  // 사용합니다.
-  // - `ReadOptions`와 관련된 읽기는 `ReadOptions::rate_limiter_priority`에서
-  // 요금이 부과될 수 있습니다.
-  //   (사용법과 제한 사항은 해당 옵션의 API 문서를 참조하세요).
-  // - `WriteOptions`와 관련된 쓰기는 `WriteOptions::rate_limiter_priority`에서
-  // 요금이 부과될 수 있습니다.
-  //   (사용법과 제한 사항은 해당 옵션의 API 문서를 참조하세요).
+  // - Flush requests write bandwidth at `Env::IOPriority::IO_HIGH`
+  // - Compaction requests read and write bandwidth at
+  //   `Env::IOPriority::IO_LOW`
+  // - Reads associated with a `ReadOptions` can be charged at
+  //   `ReadOptions::rate_limiter_priority` (see that option's API doc for usage
+  //   and limitations).
+  // - Writes associated with a `WriteOptions` can be charged at
+  //   `WriteOptions::rate_limiter_priority` (see that option's API doc for
+  //   usage and limitations).
   //
-  // 속도 제한기가 비활성화되면 nullptr로 설정됩니다. 속도 제한기가 활성화되면,
-  // bytes_per_sync는 기본값으로 1MB로 설정됩니다.
+  // Rate limiting is disabled if nullptr. If rate limiter is enabled,
+  // bytes_per_sync is set to 1MB by default.
   //
-  // 기본값: nullptr
+  // Default: nullptr
   std::shared_ptr<RateLimiter> rate_limiter = nullptr;
 
-  // SST 파일을 추적하고 해당 파일 삭제 속도를 제어하는 데 사용됩니다.
+  // Use to track SST files and control their file deletion rate.
   //
-  // 기능:
-  //  - SST 파일의 삭제 속도를 제한합니다.
-  //  - 모든 SST 파일의 총 크기를 추적합니다.
-  //  - SST 파일에 대한 최대 허용 공간 제한을 설정하여, 이 한도에 도달하면
-  //    DB는 더 이상 플러시나 컴팩션을 수행하지 않으며, 백그라운드 오류를
-  //    설정합니다.
-  //  - 여러 DB 간에 공유할 수 있습니다.
-  // 제한 사항:
-  //  - 첫 번째 db_path에서만 SST 파일 삭제를 추적하고 제한합니다.
-  //    (db_paths가 비어 있으면 db_name이 사용됩니다).
+  // Features:
+  //  - Throttle the deletion rate of the SST files.
+  //  - Keep track the total size of all SST files.
+  //  - Set a maximum allowed space limit for SST files that when reached
+  //    the DB wont do any further flushes or compactions and will set the
+  //    background error.
+  //  - Can be shared between multiple dbs.
+  // Limitations:
+  //  - Only track and throttle deletes of SST files in
+  //    first db_path (db_name if db_paths is empty).
   //
-  // 기본값: nullptr
+  // Default: nullptr
   std::shared_ptr<SstFileManager> sst_file_manager = nullptr;
 
-  // DB에서 생성된 모든 내부 진행/오류 정보는 info_log가 nullptr이 아닐 경우
-  // info_log에 기록되며, info_log가 nullptr이면 DB 내용이 저장된 동일한
-  // 디렉토리에 파일로 저장됩니다. 기본값: nullptr
+  // Any internal progress/error information generated by the db will
+  // be written to info_log if it is non-nullptr, or to a file stored
+  // in the same directory as the DB contents if info_log is nullptr.
+  // Default: nullptr
   std::shared_ptr<Logger> info_log = nullptr;
 
-  // info_log에 로그 메시지를 보내는 최소 레벨입니다. 기본값은
-  // RocksDB가 릴리스 모드로 컴파일될 때 INFO_LEVEL이며, 디버그 모드로 컴파일될
-  // 때는 DEBUG_LEVEL입니다.
+  // Minimum level for sending log messages to info_log. The default is
+  // INFO_LEVEL when RocksDB is compiled in release mode, and DEBUG_LEVEL
+  // when it is compiled in debug mode.
   InfoLogLevel info_log_level = Logger::kDefaultLogLevel;
 
-  // DB에서 사용할 수 있는 열린 파일의 수입니다. 데이터베이스에 큰 작업 세트가
-  // 있으면 이 값을 늘려야 할 수 있습니다. 값 -1은 열린 파일이 항상 열린 상태로
-  // 유지됨을 의미합니다. level 기반 컴팩션의 경우 target_file_size_base와
-  // target_file_size_multiplier를 기반으로 파일 수를 추정할 수 있습니다.
-  // 유니버설 스타일 컴팩션의 경우 보통 -1로 설정할 수 있습니다.
+  // Number of open files that can be used by the DB.  You may need to
+  // increase this if your database has a large working set. Value -1 means
+  // files opened are always kept open. You can estimate number of files based
+  // on target_file_size_base and target_file_size_multiplier for level-based
+  // compaction. For universal-style compaction, you can usually set it to -1.
   //
-  // 이 옵션의 높은 값이나 -1은 높은 메모리 사용을 초래할 수 있습니다.
-  // 블록 기반 테이블 형식의 경우 메모리 사용을 제어하려면
-  // BlockBasedTableOptions::cache_usage_options를 참조하세요.
+  // A high value or -1 for this option can cause high memory usage.
+  // See BlockBasedTableOptions::cache_usage_options to constrain
+  // memory usage in case of block based table format.
   //
-  // 기본값: -1
+  // Default: -1
   //
-  // SetDBOptions() API를 통해 동적으로 변경 가능
+  // Dynamically changeable through SetDBOptions() API.
   int max_open_files = -1;
 
-  // max_open_files가 -1인 경우, DB는 DB::Open()에서 모든 파일을 엽니다. 이
-  // 옵션을 사용하여 파일을 여는 데 사용되는 스레드 수를 늘릴 수 있습니다.
-  // 기본값: 16
+  // If max_open_files is -1, DB will open all files on DB::Open(). You can
+  // use this option to increase the number of threads used to open the files.
+  // Default: 16
   int max_file_opening_threads = 16;
 
-  // 쓰기 앞 기록(WAL)의 크기가 이 크기를 초과하면, 가장 오래된 활성 WAL 파일에
-  // 의해 백업된 memtable을 가진 컬럼 패밀리를 강제로 플러시합니다. (즉, 공간
-  // 증폭을 일으키는 컬럼 패밀리들입니다). 0으로 설정하면 (기본값), WAL 크기
-  // 제한은 [모든 write_buffer_size * max_write_buffer_number의 합] * 4로
-  // 동적으로 선택됩니다.
+  // Once write-ahead logs exceed this size, we will start forcing the flush of
+  // column families whose memtables are backed by the oldest live WAL file
+  // (i.e. the ones that are causing all the space amplification). If set to 0
+  // (default), we will dynamically choose the WAL size limit to be
+  // [sum of all write_buffer_size * max_write_buffer_number] * 4
   //
-  // 예를 들어, 15개의 컬럼 패밀리가 있고 각각에 대해
+  // For example, with 15 column families, each with
   // write_buffer_size = 128 MB
   // max_write_buffer_number = 6
-  // max_total_wal_size는 [15 * 128MB * 6] * 4 = 45GB로 계산됩니다.
+  // max_total_wal_size will be calculated to be [15 * 128MB * 6] * 4 = 45GB
   //
-  // RocksDB 위키에는 WAL이 memtable 및 컬럼 패밀리의 플러시와 어떻게
-  // 상호작용하는지에 대한 논의가 있습니다.
+  // The RocksDB wiki has some discussion about how the WAL interacts
+  // with memtables and flushing of column families.
   // https://github.com/facebook/rocksdb/wiki/Column-Families
   //
-  // 이 옵션은 컬럼 패밀리가 1개 이상일 때만 적용됩니다. 그렇지 않으면 wal
-  // 크기는 write_buffer_size에 의해 결정됩니다.
+  // This option takes effect only when there are more than one column
+  // family as otherwise the wal size is dictated by the write_buffer_size.
   //
-  // 기본값: 0
+  // Default: 0
   //
-  // SetDBOptions() API를 통해 동적으로 변경 가능
+  // Dynamically changeable through SetDBOptions() API.
   uint64_t max_total_wal_size = 0;
 
-  // nullptr이 아닌 경우, 데이터베이스 작업에 대한 메트릭을 수집해야 합니다.
+  // If non-null, then we should collect metrics about database operations
   std::shared_ptr<Statistics> statistics = nullptr;
 
-  // 기본적으로 안정적인 저장소에 대한 쓰기는 fdatasync를 사용합니다 (이 함수가
-  // 사용 가능한 플랫폼에서). 이 옵션이 true인 경우, 대신 fsync가 사용됩니다.
+  // By default, writes to stable storage use fdatasync (on platforms
+  // where this function is available). If this option is true,
+  // fsync is used instead.
   //
-  // fsync와 fdatasync는 우리의 용도에 대해 동일하게 안전하며, fdatasync가 더
-  // 빠르므로 이 옵션을 설정할 필요는 드뭅니다. 이 옵션은 커널/파일 시스템
-  // 버그에 대한 우회 방법으로 제공됩니다. 예를 들어, 3.7 이전 버전의 커널에서
-  // ext4와 관련된 fdatasync의 문제가 있었습니다.
+  // fsync and fdatasync are equally safe for our purposes and fdatasync is
+  // faster, so it is rarely necessary to set this option. It is provided
+  // as a workaround for kernel/filesystem bugs, such as one that affected
+  // fdatasync with ext4 in kernel versions prior to 3.7.
   bool use_fsync = false;
 
-  // SST 파일을 넣을 수 있는 경로 목록과 해당 경로의 대상 크기입니다.
-  // 최신 데이터는 벡터의 앞부분에 지정된 경로에 배치되며, 오래된 데이터는 점차
-  // 벡터의 뒷부분에 지정된 경로로 이동합니다.
+  // A list of paths where SST files can be put into, with its target size.
+  // Newer data is placed into paths specified earlier in the vector while
+  // older data gradually moves to paths specified later in the vector.
   //
-  // 예를 들어, 10GB의 공간을 할당한 플래시 장치와 2TB의 하드 드라이브가 있을
-  // 경우, 다음과 같이 설정해야 합니다:
+  // For example, you have a flash device with 10GB allocated for the DB,
+  // as well as a hard drive of 2TB, you should config it to be:
   //   [{"/flash_path", 10GB}, {"/hard_drive", 2TB}]
   //
-  // 시스템은 각 경로 아래의 데이터가 목표 크기에 가깝지만 그보다 크지 않도록
-  // 보장하려고 시도합니다. 하지만 파일을 배치할 위치를 결정하는 현재 및 미래의
-  // 파일 크기는 최선의 노력에 기반한 추정값이므로, 일부 작업 부하에서는 실제
-  // 크기가 경로 아래에서 목표 크기보다 약간 더 클 수 있습니다. 이런 경우를
-  // 대비해 사용자에게 약간의 여유 공간을 제공해야 합니다.
+  // The system will try to guarantee data under each path is close to but
+  // not larger than the target size. But current and future file sizes used
+  // by determining where to place a file are based on best-effort estimation,
+  // which means there is a chance that the actual size under the directory
+  // is slightly more than target size under some workloads. User should give
+  // some buffer room for those cases.
   //
-  // 만약 경로 중 어느 곳에도 파일을 배치할 충분한 공간이 없다면, 마지막 경로에
-  // 파일이 배치됩니다.
+  // If none of the paths has sufficient room to place a file, the file will
+  // be placed to the last path anyway, despite to the target size.
   //
-  // 최신 데이터를 더 앞에 지정된 경로에 배치하는 것도 최선의 노력에 의한
-  // 것입니다. 극단적인 경우에는 사용자가 더 높은 레벨에 사용자 파일이 배치될 수
-  // 있다는 점을 예상해야 합니다.
+  // Placing newer data to earlier paths is also best-efforts. User should
+  // expect user files to be placed in higher levels in some extreme cases.
   //
-  // 비어 있으면, 하나의 경로만 사용되며, 이는 DB를 열 때 전달된 db_name입니다.
-  // 기본값: 비어 있음
+  // If left empty, only one path will be used, which is db_name passed when
+  // opening the DB.
+  // Default: empty
   std::vector<DbPath> db_paths;
 
-  // info 로그 디렉토리를 지정합니다.
-  // 비어 있으면 로그 파일은 데이터와 동일한 디렉토리에 저장됩니다.
-  // 비어 있지 않으면, 로그 파일은 지정된 디렉토리에 저장되며,
-  // DB 데이터 디렉토리의 절대 경로가 로그 파일 이름의 접두사로 사용됩니다.
+  // This specifies the info LOG dir.
+  // If it is empty, the log files will be in the same dir as data.
+  // If it is non empty, the log files will be in the specified dir,
+  // and the db data dir's absolute path will be used as the log file
+  // name's prefix.
   std::string db_log_dir = "";
 
-  // 쓰기 앞 기록(WAL)을 위한 절대 디렉토리 경로를 지정합니다.
-  // 비어 있으면 로그 파일은 데이터와 동일한 디렉토리에 저장됩니다.
-  // 기본적으로 dbname이 데이터 디렉토리로 사용됩니다.
-  // 비어 있지 않으면 로그 파일은 지정된 디렉토리에 보관됩니다.
-  // DB를 삭제할 때, wal_dir 내의 모든 로그 파일과 디렉토리 자체가 삭제됩니다.
+  // This specifies the absolute dir path for write-ahead logs (WAL).
+  // If it is empty, the log files will be in the same dir as data,
+  //   dbname is used as the data dir by default
+  // If it is non empty, the log files will be in kept the specified dir.
+  // When destroying the db,
+  //   all log files in wal_dir and the dir itself is deleted
   std::string wal_dir = "";
 
-  // 오래된 파일이 삭제되는 주기. 기본값은 6시간입니다.
-  // 컴팩션 프로세스에 의해 범위를 벗어난 파일은 이 설정에 관계없이
-  // 모든 컴팩션에서 자동으로 삭제됩니다.
+  // The periodicity when obsolete files get deleted. The default
+  // value is 6 hours. The files that get out of scope by compaction
+  // process will still get automatically delete on every compaction,
+  // regardless of this setting
   //
-  // 기본값: 6시간
+  // Default: 6 hours
   //
-  // SetDBOptions() API를 통해 동적으로 변경 가능
+  // Dynamically changeable through SetDBOptions() API.
   uint64_t delete_obsolete_files_period_micros = 6ULL * 60 * 60 * 1000000;
 
-  // 동시 백그라운드 작업(컴팩션 및 플러시)의 최대 수입니다.
+  // Maximum number of concurrent background jobs (compactions and flushes).
   //
-  // 기본값: 2
+  // Default: 2
   //
-  // SetDBOptions() API를 통해 동적으로 변경 가능
+  // Dynamically changeable through SetDBOptions() API.
   int max_background_jobs = 2;
 
-  // 더 이상 사용되지 않음: RocksDB는 max_background_jobs 값을 기준으로 자동으로
-  // 결정합니다. 호환성을 위해 사용자 설정에 따라 `max_background_jobs =
-  // max_background_compactions + max_background_flushes` 로 설정됩니다.
-  // (하나라도 설정되지 않으면 -1을 1로 교체합니다).
+  // DEPRECATED: RocksDB automatically decides this based on the
+  // value of max_background_jobs. For backwards compatibility we will set
+  // `max_background_jobs = max_background_compactions + max_background_flushes`
+  // in the case where user sets at least one of `max_background_compactions` or
+  // `max_background_flushes` (we replace -1 by 1 in case one option is unset).
   //
-  // 기본 LOW 우선순위 스레드 풀에 제출된 동시 백그라운드 컴팩션 작업의 최대
-  // 수입니다.
+  // Maximum number of concurrent background compaction jobs, submitted to
+  // the default LOW priority thread pool.
   //
-  // 이 값을 늘리려면 LOW 우선순위 스레드 풀의 스레드 수도 늘리는 것을
-  // 고려하세요. 자세한 내용은 Env::SetBackgroundThreads를 참조하세요.
+  // If you're increasing this, also consider increasing number of threads in
+  // LOW priority thread pool. For more information, see
+  // Env::SetBackgroundThreads
   //
-  // 기본값: -1
+  // Default: -1
   //
-  // SetDBOptions() API를 통해 동적으로 변경 가능
+  // Dynamically changeable through SetDBOptions() API.
   int max_background_compactions = -1;
 
-  // 이 값은 컴팩션 작업을 여러 개의 작은 작업으로 나누어 동시에 실행하는
-  // 최대 스레드 수를 나타냅니다.
-  // 기본값: 1 (즉, 서브컴팩션 없음)
+  // This value represents the maximum number of threads that will
+  // concurrently perform a compaction job by breaking it into multiple,
+  // smaller ones that are run simultaneously.
+  // Default: 1 (i.e. no subcompactions)
   //
-  // SetDBOptions() API를 통해 동적으로 변경 가능
+  // Dynamically changeable through SetDBOptions() API.
   uint32_t max_subcompactions = 1;
 
-  // 더 이상 사용되지 않음: RocksDB는 max_background_jobs 값을 기준으로 자동으로
-  // 결정합니다. 호환성을 위해 사용자 설정에 따라 `max_background_jobs =
-  // max_background_compactions + max_background_flushes` 로 설정됩니다.
+  // DEPRECATED: RocksDB automatically decides this based on the
+  // value of max_background_jobs. For backwards compatibility we will set
+  // `max_background_jobs = max_background_compactions + max_background_flushes`
+  // in the case where user sets at least one of `max_background_compactions` or
+  // `max_background_flushes`.
   //
-  // 기본 HIGH 우선순위 스레드 풀에 제출된 동시 백그라운드 memtable 플러시
-  // 작업의 최대 수입니다. HIGH 우선순위 스레드 풀이 0 스레드로 설정되어 있으면,
-  // 플러시 작업은 LOW 우선순위 스레드 풀에서 컴팩션 작업과 함께 공유됩니다.
+  // Maximum number of concurrent background memtable flush jobs, submitted by
+  // default to the HIGH priority thread pool. If the HIGH priority thread pool
+  // is configured to have zero threads, flush jobs will share the LOW priority
+  // thread pool with compaction jobs.
   //
-  // 여러 DB 인스턴스에서 동일한 Env를 공유할 때 두 개의 스레드 풀을 사용하는
-  // 것이 중요합니다. 별도의 풀 없이 긴 시간 동안 실행되는 컴팩션 작업이 다른 DB
-  // 인스턴스의 memtable 플러시 작업을 차단할 수 있어 불필요한 Put 지연을 초래할
-  // 수 있습니다.
+  // It is important to use both thread pools when the same Env is shared by
+  // multiple db instances. Without a separate pool, long running compaction
+  // jobs could potentially block memtable flush jobs of other db instances,
+  // leading to unnecessary Put stalls.
   //
-  // 이 값을 늘리려면 HIGH 우선순위 스레드 풀의 스레드 수도 늘리는 것을
-  // 고려하세요. 자세한 내용은 Env::SetBackgroundThreads를 참조하세요. 기본값:
-  // -1
+  // If you're increasing this, also consider increasing number of threads in
+  // HIGH priority thread pool. For more information, see
+  // Env::SetBackgroundThreads
+  // Default: -1
   int max_background_flushes = -1;
 
-  // info 로그 파일의 최대 크기를 지정합니다. 로그 파일이
-  // `max_log_file_size`보다 크면 새로운 info 로그 파일이 생성됩니다.
-  // max_log_file_size가 0이면 모든 로그가 하나의 로그 파일에 기록됩니다.
+  // Specify the maximal size of the info log file. If the log file
+  // is larger than `max_log_file_size`, a new info log file will
+  // be created.
+  // If max_log_file_size == 0, all logs will be written to one
+  // log file.
   size_t max_log_file_size = 0;
 
-  // info 로그 파일의 롤링 주기(초 단위)입니다.
-  // 값이 0이 아닌 값으로 지정되면, 로그 파일은 `log_file_time_to_roll`보다 더
-  // 오랜 시간 동안 활성화되면 롤링됩니다. 기본값: 0 (비활성화)
+  // Time for the info log file to roll (in seconds).
+  // If specified with non-zero value, log file will be rolled
+  // if it has been active longer than `log_file_time_to_roll`.
+  // Default: 0 (disabled)
   size_t log_file_time_to_roll = 0;
 
-  // 유지할 최대 info 로그 파일 수입니다.
-  // 기본값: 1000
+  // Maximal info log files to be kept.
+  // Default: 1000
   size_t keep_log_file_num = 1000;
 
-  // 로그 파일을 재활용합니다.
-  // 값이 0이 아닌 경우, 이전에 작성된 로그 파일을 새로운 로그를 위해 재사용하며
-  // 오래된 데이터를 덮어씁니다. 이 값은 언제든지 나중에 사용할 수 있도록 유지할
-  // 로그 파일 수를 나타냅니다. 이미 할당된 블록을 재사용하고, fdatasync는 각
-  // 쓰기 후 inode를 업데이트할 필요가 없으므로 더 효율적입니다. 기본값: 0
+  // Recycle log files.
+  // If non-zero, we will reuse previously written log files for new
+  // logs, overwriting the old data.  The value indicates how many
+  // such files we will keep around at any point in time for later
+  // use.  This is more efficient because the blocks are already
+  // allocated and fdatasync does not need to update the inode after
+  // each write.
+  // Default: 0
   size_t recycle_log_file_num = 0;
 
-  // 매니페스트 파일이 이 한도에 도달하면 롤링됩니다.
-  // 오래된 매니페스트 파일은 삭제됩니다.
-  // 기본값은 1GB로, 매니페스트 파일이 커지지만 저장 용량 한도에 도달하지 않도록
-  // 설정됩니다.
+  // manifest file is rolled over on reaching this limit.
+  // The older manifest file be deleted.
+  // The default value is 1GB so that the manifest file can grow, but not
+  // reach the limit of storage capacity.
   uint64_t max_manifest_file_size = 1024 * 1024 * 1024;
 
-  // 테이블 캐시에서 사용할 샤드 수입니다.
+  // Number of shards used for table cache.
   int table_cache_numshardbits = 6;
 
-  // 다음 두 필드는 WAL이 아카이브되고 삭제되는 시점에 영향을 미칩니다.
+  // The following two fields affect when WALs will be archived and deleted.
   //
-  // 둘 다 0이면, 오래된 WAL은 아카이브되지 않고 즉시 삭제됩니다.
-  // 그렇지 않으면, 오래된 WAL은 삭제되기 전에 아카이브됩니다.
+  // When both are zero, obsolete WALs will not be archived and will be deleted
+  // immediately. Otherwise, obsolete WALs will be archived prior to deletion.
   //
-  // `WAL_size_limit_MB`가 0이 아니면, 가장 이른 WAL부터 아카이브된 WAL이
-  // 삭제되어 아카이브의 총 크기가 이 한도 이하로 떨어지게 됩니다. 모든 빈 WAL도
-  // 삭제됩니다.
+  // When `WAL_size_limit_MB` is nonzero, archived WALs starting with the
+  // earliest will be deleted until the total size of the archive falls below
+  // this limit. All empty WALs will be deleted.
   //
-  // `WAL_ttl_seconds`가 0이 아니면, `WAL_ttl_seconds`보다 오래된 아카이브된
-  // WAL이 삭제됩니다.
+  // When `WAL_ttl_seconds` is nonzero, archived WALs older than
+  // `WAL_ttl_seconds` will be deleted.
   //
-  // `WAL_ttl_seconds`만 0이 아닌 경우, 아카이브된 WAL이 삭제되는 주기는
-  // `WAL_ttl_seconds / 2`초입니다. `WAL_size_limit_MB`만 0이 아닌 경우, 삭제
-  // 주기는 10분마다 이루어집니다. 두 값이 모두 0이 아니면, 삭제 주기는 두 값 중
-  // 최소값이 됩니다.
+  // When only `WAL_ttl_seconds` is nonzero, the frequency at which archived
+  // WALs are deleted is every `WAL_ttl_seconds / 2` seconds. When only
+  // `WAL_size_limit_MB` is nonzero, the deletion frequency is every ten
+  // minutes. When both are nonzero, the deletion frequency is the minimum of
+  // those two values.
   uint64_t WAL_ttl_seconds = 0;
   uint64_t WAL_size_limit_MB = 0;
 
-  // 매니페스트 파일을 미리 할당할 바이트 수(fallocate를 통해)입니다.
-  // 기본값은 4MB로, 이는 무작위 I/O를 줄이고
-  // 대용량 데이터를 미리 할당하는 마운트(예: xfs의 allocsize 옵션)에서 과할당을
-  // 방지하는 데 합리적입니다.
+  // Number of bytes to preallocate (via fallocate) the manifest
+  // files.  Default is 4mb, which is reasonable to reduce random IO
+  // as well as prevent overallocation for mounts that preallocate
+  // large amounts of data (such as xfs's allocsize option).
   size_t manifest_preallocation_size = 4 * 1024 * 1024;
 
-  // OS가 SST 테이블을 읽기 위해 파일을 mmap하도록 허용합니다.
-  // 32비트 OS에서는 권장하지 않습니다.
-  // 이 옵션이 true로 설정되고 압축이 비활성화되면, 블록은 복사되지 않고 mmap된
-  // 메모리 영역에서 직접 읽히며, 블록은 블록 캐시에 삽입되지 않습니다. 그러나
-  // `ReadOptions.verify_checksums`가 true로 설정되면 여전히 체크섬 검사가
-  // 이루어집니다. 이는 블록을 읽을 때마다 체크섬 검사를 의미하며, 옵션이
-  // false로 설정되고 블록 캐시가 사용될 때보다 더 많은 검사 횟수를 초래할 수
-  // 있습니다. 이 옵션의 일반적인 사용 사례는 RocksDB를 ramfs에서 실행하는
-  // 것입니다. 여기서는 체크섬 검증이 보통 필요하지 않습니다. 기본값: false
+  // Allow the OS to mmap file for reading sst tables.
+  // Not recommended for 32-bit OS.
+  // When the option is set to true and compression is disabled, the blocks
+  // will not be copied and will be read directly from the mmap-ed memory
+  // area, and the block will not be inserted into the block cache. However,
+  // checksums will still be checked if ReadOptions.verify_checksums is set
+  // to be true. It means a checksum check every time a block is read, more
+  // than the setup where the option is set to false and the block cache is
+  // used. The common use of the options is to run RocksDB on ramfs, where
+  // checksum verification is usually not needed.
+  // Default: false
   bool allow_mmap_reads = false;
 
-  // OS가 파일을 mmap하여 쓰기를 허용합니다.
-  // DB::SyncWAL()은 이 옵션이 false로 설정되어야만 작동합니다.
-  // 기본값: false
+  // Allow the OS to mmap file for writing.
+  // DB::SyncWAL() only works if this is set to false.
+  // Default: false
   bool allow_mmap_writes = false;
 
-  // 읽기/쓰기에 대해 직접 I/O 모드를 활성화합니다.
-  // 사용 사례에 따라 성능을 개선할 수도, 그렇지 않을 수도 있습니다.
+  // Enable direct I/O mode for read/write
+  // they may or may not improve performance depending on the use case
   //
-  // 파일은 "직접 I/O" 모드로 열립니다.
-  // 즉, 디스크에서의 데이터 읽기/쓰기는 캐시되거나 버퍼링되지 않습니다.
-  // 그러나 장치의 하드웨어 버퍼는 여전히 사용될 수 있습니다. 메모리 매핑된
-  // 파일은 이 파라미터의 영향을 받지 않습니다.
+  // Files will be opened in "direct I/O" mode
+  // which means that data r/w from the disk will not be cached or
+  // buffered. The hardware buffer of the devices may however still
+  // be used. Memory mapped files are not impacted by these parameters.
 
-  // 사용자 및 컴팩션 읽기에 O_DIRECT를 사용합니다.
-  // 기본값: false
+  // Use O_DIRECT for user and compaction reads.
+  // Default: false
   bool use_direct_reads = false;
 
-  // 백그라운드 플러시 및 컴팩션에서 쓰기에 O_DIRECT를 사용합니다.
-  // 기본값: false
+  // Use O_DIRECT for writes in background flush and compactions.
+  // Default: false
   bool use_direct_io_for_flush_and_compaction = false;
 
-  // false이면 fallocate() 호출이 우회되어 파일 미리 할당이 비활성화됩니다.
-  // 파일 공간 미리 할당은 파일 쓰기/추가 성능을 높이는 데 사용됩니다.
-  // 기본적으로 RocksDB는 WAL, SST, 매니페스트 파일에 대해 공간을 미리 할당하며,
-  // 파일이 기록될 때 추가된 공간은 잘립니다.
-  // 경고: btrfs를 사용하는 경우, 미리 할당을 비활성화하려면
-  // `allow_fallocate=false`로 설정하는 것이 좋습니다. btrfs에서 추가로 할당된
-  // 공간은 해제할 수 없으며, 많은 파일을 가지고 있을 경우 큰 영향을 미칠 수
-  // 있습니다. 이 제한에 대한 자세한 내용:
+  // If false, fallocate() calls are bypassed, which disables file
+  // preallocation. The file space preallocation is used to increase the file
+  // write/append performance. By default, RocksDB preallocates space for WAL,
+  // SST, Manifest files, the extra space is truncated when the file is written.
+  // Warning: if you're using btrfs, we would recommend setting
+  // `allow_fallocate=false` to disable preallocation. As on btrfs, the extra
+  // allocated space cannot be freed, which could be significant if you have
+  // lots of files. More details about this limitation:
   // https://github.com/btrfs/btrfs-dev-docs/blob/471c5699336e043114d4bca02adcd57d9dab9c44/data-extent-reference-counts.md
   bool allow_fallocate = true;
 
-  // 자식 프로세스가 열린 파일을 상속하지 않도록 설정합니다. 기본값: true
+  // Disable child process inherit open files. Default: true
   bool is_fd_close_on_exec = true;
 
-  // 0이 아니면, 매 `stats_dump_period_sec` 초마다 RocksDB 통계를 LOG에
-  // 덤프합니다.
+  // if not zero, dump rocksdb.stats to LOG every stats_dump_period_sec
   //
-  // 기본값: 600 (10분)
+  // Default: 600 (10 min)
   //
-  // SetDBOptions() API를 통해 동적으로 변경 가능
+  // Dynamically changeable through SetDBOptions() API.
   unsigned int stats_dump_period_sec = 600;
 
-  // 0이 아니면, 매 `stats_persist_period_sec` 초마다 RocksDB 통계를 디스크에
-  // 저장합니다. 기본값: 600
+  // if not zero, dump rocksdb.stats to RocksDB every stats_persist_period_sec
+  // Default: 600
   unsigned int stats_persist_period_sec = 600;
 
-  // true인 경우, 매 `stats_persist_period_sec` 초마다 통계를 숨겨진 컬럼
-  // 패밀리(`___rocksdb_stats_history___`)에 자동으로 저장합니다. 그렇지 않으면,
-  // 메모리 내 구조체에 기록됩니다. 사용자는 `GetStatsHistory` API를 통해 이를
-  // 쿼리할 수 있습니다. 만약 사용자가 동일한 이름의 컬럼 패밀리를 DB에
-  // 생성하려고 하면, 컬럼 패밀리 생성이 실패합니다. 하지만 숨겨진 컬럼 패밀리는
-  // 살아남으며, 이전에 저장된 통계도 유지됩니다. 디스크에 통계를 저장할 때,
-  // 통계 이름은 최대 100바이트로 제한됩니다. 기본값: false
+  // If true, automatically persist stats to a hidden column family (column
+  // family name: ___rocksdb_stats_history___) every
+  // stats_persist_period_sec seconds; otherwise, write to an in-memory
+  // struct. User can query through `GetStatsHistory` API.
+  // If user attempts to create a column family with the same name on a DB
+  // which have previously set persist_stats_to_disk to true, the column family
+  // creation will fail, but the hidden column family will survive, as well as
+  // the previously persisted statistics.
+  // When peristing stats to disk, the stat name will be limited at 100 bytes.
+  // Default: false
   bool persist_stats_to_disk = false;
 
-  // 0이 아니면, 주기적으로 통계 스냅샷을 찍어 메모리에 저장합니다.
-  // 통계 스냅샷에 대한 메모리 크기는 stats_history_buffer_size로 제한됩니다.
-  // 기본값: 1MB
+  // if not zero, periodically take stats snapshots and store in memory, the
+  // memory size for stats snapshots is capped at stats_history_buffer_size
+  // Default: 1MB
   size_t stats_history_buffer_size = 1024 * 1024;
 
-  // true로 설정하면, SST 파일이 열릴 때 파일 시스템에 접근 패턴이 랜덤임을
-  // 힌트로 제공합니다. 기본값: true
+  // If set true, will hint the underlying file system that the file
+  // access pattern is random, when a sst file is opened.
+  // Default: true
   bool advise_random_on_open = true;
 
-  // 디스크에 데이터를 쓸 때 모든 컬럼 패밀리에서 memtable에 축적되는 데이터
-  // 양입니다.
+  // Amount of data to build up in memtables across all column
+  // families before writing to disk.
   //
-  // 이것은 단일 memtable에 대한 제한을 설정하는 write_buffer_size와는 다릅니다.
+  // This is distinct from write_buffer_size, which enforces a limit
+  // for a single memtable.
   //
-  // 이 기능은 기본적으로 비활성화되어 있습니다. 비활성화된 경우 0을 설정하고,
-  // 활성화하려면 0이 아닌 값을 설정해야 합니다.
+  // This feature is disabled by default. Specify a non-zero value
+  // to enable it.
   //
-  // 기본값: 0 (비활성화)
+  // Default: 0 (disabled)
   size_t db_write_buffer_size = 0;
 
-  // memtable의 메모리 사용량을 이 객체에 보고합니다. 동일한 객체는 여러 DB에
-  // 전달될 수 있으며, 모든 DB의 크기 합계를 추적합니다. 만약 모든 DB의 활성
-  // memtable 크기의 총합이 한도를 초과하면, 다음 쓰기가 발생하는 DB에서
-  // 플러시가 트리거됩니다. 단, 이미 플러시 중인 컬럼 패밀리가 하나 이상 없어야
-  // 합니다.
+  // The memory usage of memtable will report to this object. The same object
+  // can be passed into multiple DBs and it will track the sum of size of all
+  // the DBs. If the total size of all live memtables of all the DBs exceeds
+  // a limit, a flush will be triggered in the next DB to which the next write
+  // is issued, as long as there is one or more column family not already
+  // flushing.
   //
-  // 이 객체가 하나의 DB에만 전달되면 db_write_buffer_size와 동일하게
-  // 동작합니다. write_buffer_manager가 설정되면, 설정된 값이
-  // db_write_buffer_size를 덮어씁니다.
+  // If the object is only passed to one DB, the behavior is the same as
+  // db_write_buffer_size. When write_buffer_manager is set, the value set will
+  // override db_write_buffer_size.
   //
-  // 이 기능은 기본적으로 비활성화되어 있습니다. 비활성화된 경우 0을 설정하고,
-  // 활성화하려면 0이 아닌 값을 설정해야 합니다.
+  // This feature is disabled by default. Specify a non-zero value
+  // to enable it.
   //
-  // 기본값: null
+  // Default: null
   std::shared_ptr<WriteBufferManager> write_buffer_manager = nullptr;
 
-  // 0이 아니면, 컴팩션 중에 더 큰 읽기를 수행합니다.
-  // 만약 스핀 디스크에서 RocksDB를 실행하는 경우, 최소한 2MB로 설정하는 것이
-  // 좋습니다. 이 값으로 RocksDB의 컴팩션은 랜덤 읽기 대신 순차 읽기를
-  // 수행합니다.
+  // If non-zero, we perform bigger reads when doing compaction. If you're
+  // running RocksDB on spinning disks, you should set this to at least 2MB.
+  // That way RocksDB's compaction is doing sequential instead of random reads.
   //
-  // 기본값: 2MB
+  // Default: 2MB
   //
-  // SetDBOptions() API를 통해 동적으로 변경 가능
+  // Dynamically changeable through SetDBOptions() API.
   size_t compaction_readahead_size = 2 * 1024 * 1024;
 
-  // 이는 WinMmapReadableFile이 비버퍼링된 디스크 I/O 모드에서 사용하는 최대
-  // 버퍼 크기입니다. 읽기를 위한 정렬된 버퍼를 유지해야 합니다. 버퍼는 지정된
-  // 크기까지 성장할 수 있으며, 그 이후에는 더 큰 요청에 대해 일회성 버퍼를
-  // 할당합니다. 비버퍼링 모드에서는 ReadaheadRandomAccessFile에서 읽기 예비
-  // 버퍼를 우회합니다. 예비 읽기가 필요한 경우, compaction_readahead_size 값을
-  // 사용하여 항상 예비 읽기를 시도합니다. 예비 읽기에서는 버퍼 크기를 제한에
-  // 맞게 성장시키는 대신 미리 할당합니다.
+  // This is a maximum buffer size that is used by WinMmapReadableFile in
+  // unbuffered disk I/O mode. We need to maintain an aligned buffer for
+  // reads. We allow the buffer to grow until the specified value and then
+  // for bigger requests allocate one shot buffers. In unbuffered mode we
+  // always bypass read-ahead buffer at ReadaheadRandomAccessFile
+  // When read-ahead is required we then make use of compaction_readahead_size
+  // value and always try to read ahead. With read-ahead we always
+  // pre-allocate buffer to the size instead of growing it up to a limit.
   //
-  // 이 옵션은 현재 Windows에서만 적용됩니다.
+  // This option is currently honored only on Windows
   //
-  // 기본값: 1MB
+  // Default: 1 Mb
   //
-  // 특별 값: 0 - 인스턴스별 버퍼를 유지하지 않음을 의미합니다. 요청별로 버퍼를
-  // 할당하고 잠금을 피합니다.
+  // Special value: 0 - means do not maintain per instance buffer. Allocate
+  //                per request buffer and avoid locking.
   size_t random_access_max_buffer_size = 1024 * 1024;
 
-  // 이것은 WritableFileWriter에서 사용되는 최대 버퍼 크기입니다.
-  // 직접 I/O에서는 쓰기 요청이 정렬될 수 있도록 정렬된 버퍼를 유지해야 합니다.
-  // 우리는 버퍼가 한도에 도달할 때까지 크기를 키울 수 있도록 허용하고,
-  // 직접 I/O를 사용할 때는 쓰기 요청의 정렬을 보장하기 위해 버퍼 크기를
-  // 고정합니다. (논리적 섹터 크기가 비정상적인 경우)
+  // This is the maximum buffer size that is used by WritableFileWriter.
+  // With direct IO, we need to maintain an aligned buffer for writes.
+  // We allow the buffer to grow until it's size hits the limit in buffered
+  // IO and fix the buffer size when using direct IO to ensure alignment of
+  // write requests if the logical sector size is unusual
   //
-  // 기본값: 1024 * 1024 (1MB)
+  // Default: 1024 * 1024 (1 MB)
   //
-  // SetDBOptions() API를 통해 동적으로 변경 가능
+  // Dynamically changeable through SetDBOptions() API.
   size_t writable_file_max_buffer_size = 1024 * 1024;
 
-  // 사용자 공간에서 회전한 후 커널로 넘어가는 적응형 뮤텍스를 사용합니다.
-  // 뮤텍스가 많이 경합하지 않을 경우 컨텍스트 전환을 줄일 수 있습니다.
-  // 그러나 뮤텍스가 뜨겁다면 회전 시간을 낭비할 수 있습니다.
-  // 기본값: false
+  // Use adaptive mutex, which spins in the user space before resorting
+  // to kernel. This could reduce context switch when the mutex is not
+  // heavily contended. However, if the mutex is hot, we could end up
+  // wasting spin time.
+  // Default: false
   bool use_adaptive_mutex = false;
 
-  // 기본값으로 모든 필드에 대해 DBOptions를 생성합니다.
+  // Create DBOptions with default values for all fields
   DBOptions();
-  // Options로부터 DBOptions를 생성합니다.
+  // Create DBOptions from Options
   explicit DBOptions(const Options& options);
 
   void Dump(Logger* log) const;
 
-  // 파일이 디스크에 비동기적으로 백그라운드에서 기록되는 동안 OS가 파일을
-  // 점진적으로 동기화하도록 허용합니다. 이 작업은 시간에 따라 쓰기 I/O를
-  // 부드럽게 만들 수 있습니다. 사용자는 이를 지속성 보장에 의존해서는 안
-  // 됩니다. `bytes_per_sync` 바이트가 기록될 때마다 하나의 요청을 발생시킵니다.
-  // 0이면 비활성화됩니다.
+  // Allows OS to incrementally sync files to disk while they are being
+  // written, asynchronously, in the background. This operation can be used
+  // to smooth out write I/Os over time. Users shouldn't rely on it for
+  // persistence guarantee.
+  // Issue one request for every bytes_per_sync written. 0 turns it off.
   //
-  // 디바이스에 대한 쓰기 속도를 조절하기 위해 rate_limiter를 사용하는 것을
-  // 고려할 수 있습니다. rate_limiter가 활성화되면 자동으로 `bytes_per_sync`가
-  // 1MB로 설정됩니다.
+  // You may consider using rate_limiter to regulate write rate to device.
+  // When rate limiter is enabled, it automatically enables bytes_per_sync
+  // to 1MB.
   //
-  // 이 옵션은 테이블 파일에 적용됩니다.
+  // This option applies to table files
   //
-  // 기본값: 0, 비활성화됨
+  // Default: 0, turned off
   //
-  // 주의: WAL 파일에는 적용되지 않습니다. 대신 wal_bytes_per_sync를
-  // 참조하십시오. SetDBOptions() API를 통해 동적으로 변경 가능
+  // Note: DOES NOT apply to WAL files. See wal_bytes_per_sync instead
+  // Dynamically changeable through SetDBOptions() API.
   uint64_t bytes_per_sync = 0;
 
-  // bytes_per_sync와 동일하지만, WAL 파일에 적용됩니다.
-  // 이 옵션은 WAL이 생성된 순서대로 동기화된다고 보장하지 않습니다.
-  // 새 WAL은 이전 WAL이 동기화되지 않은 상태에서 동기화될 수 있습니다.
-  // 따라서 시스템 충돌 시, WAL 데이터에서 빈 부분이 발생할 수 있어 일부 데이터
-  // 손실이 발생할 수 있습니다.
+  // Same as bytes_per_sync, but applies to WAL files
+  // This does not gaurantee the WALs are synced in the order of creation. New
+  // WAL can be synced while an older WAL doesn't. Therefore upon system crash,
+  // this hole in the WAL data can create partial data loss.
   //
-  // 기본값: 0, 비활성화됨
+  // Default: 0, turned off
   //
-  // SetDBOptions() API를 통해 동적으로 변경 가능
+  // Dynamically changeable through SetDBOptions() API.
   uint64_t wal_bytes_per_sync = 0;
 
-  // true일 경우, 각 주어진 시간에 WAL 파일은 최대 `wal_bytes_per_sync` 바이트,
-  // SST 파일은 최대 `bytes_per_sync` 바이트가 기록 대기 중인 상태로 보장됩니다.
-  // 이 옵션은 파일 생성 중 처리 속도가 I/O 속도를 초과할 때 유용할 수 있으며,
-  // 이로 인해 파일이 완료될 때 대규모 동기화가 발생하는 것을 방지합니다.
+  // When true, guarantees WAL files have at most `wal_bytes_per_sync`
+  // bytes submitted for writeback at any given time, and SST files have at most
+  // `bytes_per_sync` bytes pending writeback at any given time. This can be
+  // used to handle cases where processing speed exceeds I/O speed during file
+  // generation, which can lead to a huge sync when the file is finished, even
+  // with `bytes_per_sync` / `wal_bytes_per_sync` properly configured.
   //
-  //  - `sync_file_range`가 지원되면, 이는 이전 `sync_file_range`가 완료될
-  //  때까지 기다린 후 진행합니다.
-  //    이렇게 하면 처리(압축 등)는 `sync_file_range` 간의 간격에서 방해 없이
-  //    진행될 수 있으며, I/O가 뒤처질 때만 차단됩니다.
-  //  - 그렇지 않으면 `WritableFile::Sync` 메서드가 사용됩니다. 이 메커니즘은
-  //  항상 차단되므로
-  //    I/O와 처리가 교차되는 것을 방지합니다.
+  //  - If `sync_file_range` is supported it achieves this by waiting for any
+  //    prior `sync_file_range`s to finish before proceeding. In this way,
+  //    processing (compression, etc.) can proceed uninhibited in the gap
+  //    between `sync_file_range`s, and we block only when I/O falls behind.
+  //  - Otherwise the `WritableFile::Sync` method is used. Note this mechanism
+  //    always blocks, thus preventing the interleaving of I/O and processing.
   //
-  // 주의: 이 옵션을 활성화해도 추가적인 지속성 보장이 제공되지 않습니다.
-  //       왜냐하면 `sync_file_range`가 메타데이터를 기록하지 않기 때문입니다.
+  // Note: Enabling this option does not provide any additional persistence
+  // guarantees, as it may use `sync_file_range`, which does not write out
+  // metadata.
   //
-  // 기본값: false
+  // Default: false
   bool strict_bytes_per_sync = false;
 
-  // 특정 RocksDB 이벤트가 발생할 때 콜백 함수가 호출될 EventListener의
-  // 벡터입니다.
+  // A vector of EventListeners whose callback functions will be called
+  // when specific RocksDB event happens.
   std::vector<std::shared_ptr<EventListener>> listeners;
 
-  // true이면, 이 DB에 관련된 스레드의 상태가 추적되고
-  // GetThreadList() API를 통해 이용할 수 있게 됩니다.
+  // If true, then the status of the threads involved in this DB will
+  // be tracked and available via GetThreadList() API.
   //
-  // 기본값: false
+  // Default: false
   bool enable_thread_tracking = false;
 
-  // soft_pending_compaction_bytes_limit 또는
-  // level0_slowdown_writes_trigger가 발생하거나, 마지막 memtable에 쓰고 있고
-  // 3개 이상의 memtable을 허용하는 경우, DB에 대한 제한된 쓰기 속도입니다.
-  // 이 값은 압축 전 사용자 쓰기 요청의 크기를 사용하여 계산됩니다.
-  // 컴팩션이 더 뒤처지면 RocksDB가 더 느리게 쓸 수 있습니다.
-  // 값이 0이면, `rate_limiter` 값이 비어 있지 않으면 그 값에서 유추하고,
-  // 비어 있으면 16MB로 설정됩니다. DB가 열린 후 사용자가 `rate_limiter`에서
-  // 속도를 변경하면, `delayed_write_rate`는 조정되지 않습니다.
+  // The limited write rate to DB if soft_pending_compaction_bytes_limit or
+  // level0_slowdown_writes_trigger is triggered, or we are writing to the
+  // last mem table allowed and we allow more than 3 mem tables. It is
+  // calculated using size of user write requests before compression.
+  // RocksDB may decide to slow down more if the compaction still
+  // gets behind further.
+  // If the value is 0, we will infer a value from `rater_limiter` value
+  // if it is not empty, or 16MB if `rater_limiter` is empty. Note that
+  // if users change the rate in `rate_limiter` after DB is opened,
+  // `delayed_write_rate` won't be adjusted.
   //
-  // 단위: 초당 바이트
+  // Unit: byte per second.
   //
-  // 기본값: 0
+  // Default: 0
   //
-  // SetDBOptions() API를 통해 동적으로 변경 가능
+  // Dynamically changeable through SetDBOptions() API.
   uint64_t delayed_write_rate = 0;
 
-  // 기본적으로 하나의 쓰기 스레드 큐가 유지됩니다. 큐의 맨 앞에 있는 스레드는
-  // 쓰기 배치 그룹 리더가 되어 WAL과 memtable에 배치 그룹을 쓰는 역할을 합니다.
+  // By default, a single write thread queue is maintained. The thread gets
+  // to the head of the queue becomes write batch group leader and responsible
+  // for writing to WAL and memtable for the batch group.
   //
-  // enable_pipelined_write가 true인 경우, WAL 쓰기와 memtable 쓰기를 위한
-  // 별도의 쓰기 스레드 큐가 유지됩니다. 쓰기 스레드는 먼저 WAL 작성자 큐에
-  // 들어가고, 그 후에 memtable 작성자 큐에 들어갑니다. 따라서 WAL 작성자 큐에서
-  // 대기 중인 스레드는 이전 쓰기 작업이 WAL 작성을 마칠 때까지 기다리지만,
-  // memtable 작성을 기다릴 필요는 없습니다. 이 기능을 활성화하면 쓰기 처리량이
-  // 개선되고, 두 단계 커밋의 준비 단계의 지연 시간이 줄어들 수 있습니다.
+  // If enable_pipelined_write is true, separate write thread queue is
+  // maintained for WAL write and memtable write. A write thread first enter WAL
+  // writer queue and then memtable writer queue. Pending thread on the WAL
+  // writer queue thus only have to wait for previous writers to finish their
+  // WAL writing but not the memtable writing. Enabling the feature may improve
+  // write throughput and reduce latency of the prepare phase of two-phase
+  // commit.
   //
-  // 기본값: false
+  // Default: false
   bool enable_pipelined_write = false;
 
-  // unordered_write를 true로 설정하면 스냅샷의 불변성 보장을 희생하여 더 높은
-  // 쓰기 처리량을 얻을 수 있습니다. 이는 스냅샷에서 ::Get뿐만 아니라
-  // ::MultiGet과 Iterator의 일관된 시점 보기 속성에서 기대되는 반복 가능성을
-  // 위반합니다. 애플리케이션이 이러한 완화된 보장을 용납할 수 없다면, 더 높은
-  // 처리량을 얻으면서 이를 해결할 수 있는 자체 메커니즘을 구현할 수 있습니다.
-  // 예를 들어, WRITE_PREPARED 쓰기 정책과 two_write_queues=true를 사용하는
-  // TransactionDB를 통해 unordered_write에도 불구하고 불변 스냅샷을 달성할 수
-  // 있습니다.
+  // Setting unordered_write to true trades higher write throughput with
+  // relaxing the immutability guarantee of snapshots. This violates the
+  // repeatability one expects from ::Get from a snapshot, as well as
+  // ::MultiGet and Iterator's consistent-point-in-time view property.
+  // If the application cannot tolerate the relaxed guarantees, it can implement
+  // its own mechanisms to work around that and yet benefit from the higher
+  // throughput. Using TransactionDB with WRITE_PREPARED write policy and
+  // two_write_queues=true is one way to achieve immutable snapshots despite
+  // unordered_write.
   //
-  // 기본적으로, 즉 false일 때, RocksDB는 모든 하위 시퀀스 번호를 가진 쓰기가
-  // 완료되지 않으면 새로운 스냅샷을 위한 시퀀스 번호를 증가시키지 않습니다.
-  // 이는 우리가 스냅샷에서 기대하는 불변성을 제공합니다. 또한 Iterator와
-  // MultiGet은 내부적으로 스냅샷에 의존하기 때문에, 스냅샷의 불변성은
-  // Iterator와 MultiGet이 일관된 시점 보기를 제공하게 만듭니다. true로
-  // 설정하면, Read-Your-Own-Write 속성은 여전히 제공되지만, 스냅샷의 불변성
-  // 속성은 완화됩니다: 스냅샷을 얻은 후에 발생한 쓰기(더 큰 시퀀스 번호를 가진
-  // 쓰기)는 여전히 그 스냅샷에서 읽은 내용에는 표시되지 않지만, 여전히 대기
-  // 중인 쓰기(더 작은 시퀀스 번호를 가진 쓰기)가 메모리 테이블에 적용되면
-  // 스냅샷에서 볼 수 있는 상태를 변경할 수 있습니다.
+  // By default, i.e., when it is false, rocksdb does not advance the sequence
+  // number for new snapshots unless all the writes with lower sequence numbers
+  // are already finished. This provides the immutability that we expect from
+  // snapshots. Moreover, since Iterator and MultiGet internally depend on
+  // snapshots, the snapshot immutability results into Iterator and MultiGet
+  // offering consistent-point-in-time view. If set to true, although
+  // Read-Your-Own-Write property is still provided, the snapshot immutability
+  // property is relaxed: the writes issued after the snapshot is obtained (with
+  // larger sequence numbers) will be still not visible to the reads from that
+  // snapshot, however, there still might be pending writes (with lower sequence
+  // number) that will change the state visible to the snapshot after they are
+  // landed to the memtable.
   //
-  // 기본값: false
+  // Default: false
   bool unordered_write = false;
 
-  // true이면, 여러 쓰기 스레드가 동시에 memtable을 업데이트할 수 있도록
-  // 허용합니다. 일부 memtable_factory만 동시 쓰기를 지원합니다. 현재는
-  // SkipListFactory에서만 구현되어 있습니다. 동시 memtable 쓰기는
-  // inplace_update_support나 filter_deletes와 호환되지 않습니다. 이 기능을
-  // 사용하려면 enable_write_thread_adaptive_yield를 설정하는 것이 강력히
-  // 권장됩니다.
+  // If true, allow multi-writers to update mem tables in parallel.
+  // Only some memtable_factory-s support concurrent writes; currently it
+  // is implemented only for SkipListFactory.  Concurrent memtable writes
+  // are not compatible with inplace_update_support or filter_deletes.
+  // It is strongly recommended to set enable_write_thread_adaptive_yield
+  // if you are going to use this feature.
   //
-  // 기본값: true
+  // Default: true
   bool allow_concurrent_memtable_write = true;
 
-  // true이면, 쓰기 배치 그룹 리더와 동기화하는 스레드는 mutex를 차단하기 전에
-  // 최대 write_thread_max_yield_usec만큼 기다립니다. 이 기능은 동시 작업
-  // 부하에서 처리량을 상당히 개선할 수 있습니다.
-  // enable_concurrent_memtable_write가 활성화되었는지에 관계없이 적용됩니다.
+  // If true, threads synchronizing with the write batch group leader will
+  // wait for up to write_thread_max_yield_usec before blocking on a mutex.
+  // This can substantially improve throughput for concurrent workloads,
+  // regardless of whether allow_concurrent_memtable_write is enabled.
   //
-  // 기본값: true
+  // Default: true
   bool enable_write_thread_adaptive_yield = true;
 
-  // WAL이나 memtable 쓰기의 단일 배치에서 작성되는 바이트 수의 최대 한도입니다.
-  // 리더의 쓰기 크기가 이 한도의 1/8보다 크면 이를 따릅니다.
+  // The maximum limit of number of bytes that are written in a single batch
+  // of WAL or memtable write. It is followed when the leader write size
+  // is larger than 1/8 of this limit.
   //
-  // 기본값: 1MB
+  // Default: 1 MB
   uint64_t max_write_batch_group_size_bytes = 1 << 20;
 
-  // 쓰기 작업이 mutex를 차단하기 전에 쓰기 스레드가 다른 쓰기 스레드와 조정을
-  // 위해 회전하는 데 사용할 최대 마이크로초입니다.
-  // (write_thread_slow_yield_usec가 제대로 설정되어 있다고 가정) 이 값을
-  // 증가시키면 CPU 사용량이 증가하는 대신 RocksDB의 처리량이 증가할 수
-  // 있습니다.
+  // The maximum number of microseconds that a write operation will use
+  // a yielding spin loop to coordinate with other write threads before
+  // blocking on a mutex.  (Assuming write_thread_slow_yield_usec is
+  // set properly) increasing this value is likely to increase RocksDB
+  // throughput at the expense of increased CPU usage.
   //
-  // 기본값: 100
+  // Default: 100
   uint64_t write_thread_max_yield_usec = 100;
 
-  // std::this_thread::yield 호출이 다른 프로세스나 스레드가 현재 코어를
-  // 사용하려는 신호로 간주되는 마이크로초 단위의 대기 시간입니다. 이 값을
-  // 증가시키면 쓰기 스레드가 회전하면서 CPU를 더 많이 사용할 가능성이 높아지며,
-  // 이는 강제로 발생한 컨텍스트 전환 횟수 증가로 나타납니다.
+  // The latency in microseconds after which a std::this_thread::yield
+  // call (sched_yield on Linux) is considered to be a signal that
+  // other processes or threads would like to use the current core.
+  // Increasing this makes writer threads more likely to take CPU
+  // by spinning, which will show up as an increase in the number of
+  // involuntary context switches.
   //
-  // 기본값: 3
+  // Default: 3
   uint64_t write_thread_slow_yield_usec = 3;
 
-  // true이면, DB::Open()에서 많은 파일에서 테이블 속성을 로드하여 컴팩션 결정을
-  // 최적화하는 데 사용하는 통계를 업데이트하지 않습니다. 이 기능을 끄면 디스크
-  // 환경에서 DB 열기 시간이 개선됩니다.
+  // If true, then DB::Open() will not update the statistics used to optimize
+  // compaction decision by loading table properties from many files.
+  // Turning off this feature will improve DBOpen time especially in
+  // disk environment.
   //
-  // 기본값: false
+  // Default: false
   bool skip_stats_update_on_db_open = false;
 
-  // true이면, DB::Open()에서 모든 sst 파일의 크기를 가져와서 확인하지 않습니다.
-  // sst 파일이 많을 경우, 특히 GetFileSize()가 비싼 비기본 Env를 사용하는 경우
-  // 시작 시간이 크게 단축될 수 있습니다. 여전히 모든 필수 sst 파일이 존재하는지
-  // 확인합니다. paranoid_checks가 false이면 이 옵션은 무시되고 sst 파일은 전혀
-  // 확인되지 않습니다.
+  // If true, then DB::Open() will not fetch and check sizes of all sst files.
+  // This may significantly speed up startup if there are many sst files,
+  // especially when using non-default Env with expensive GetFileSize().
+  // We'll still check that all required sst files exist.
+  // If paranoid_checks is false, this option is ignored, and sst files are
+  // not checked at all.
   //
-  // 기본값: false
+  // Default: false
   bool skip_checking_sst_file_sizes_on_db_open = false;
 
-  // WAL을 재생할 때 일관성을 제어하는 복구 모드입니다.
-  // 기본값: kPointInTimeRecovery
+  // Recovery mode to control the consistency while replaying WAL
+  // Default: kPointInTimeRecovery
   WALRecoveryMode wal_recovery_mode = WALRecoveryMode::kPointInTimeRecovery;
 
-  // false로 설정되면, WAL에서 준비된 트랜잭션이 발견되면 복구가 실패합니다.
+  // if set to false then recovery will fail when a prepared
+  // transaction is encountered in the WAL
   bool allow_2pc = false;
 
-  // 테이블 수준 행을 위한 전역 캐시입니다.
-  // Get() 쿼리 속도를 높이는 데 사용됩니다.
-  // 참고: 아직 DeleteRange()와는 작동하지 않습니다.
-  // 기본값: nullptr (비활성화)
+  // A global cache for table-level rows.
+  // Used to speed up Get() queries.
+  // NOTE: does not work with DeleteRange() yet.
+  // Default: nullptr (disabled)
   std::shared_ptr<RowCache> row_cache = nullptr;
 
-  // 복구 중 WAL(쓰기 앞 기록)을 처리할 때 호출되는 필터 객체입니다.
-  // 이 필터는 로그 기록을 검사하고 특정 기록을 무시하거나 재생을 건너뛸 수 있는
-  // 방법을 제공합니다. 이 필터는 시작 시 호출되며 현재는 단일 스레드에서만
-  // 호출됩니다.
+  // A filter object supplied to be invoked while processing write-ahead-logs
+  // (WALs) during recovery. The filter provides a way to inspect log
+  // records, ignoring a particular record or skipping replay.
+  // The filter is invoked at startup and is invoked from a single-thread
+  // currently.
   WalFilter* wal_filter = nullptr;
 
-  // 더 이상 사용되지 않음: 이 옵션은 향후 릴리스에서 제거될 수 있습니다.
+  // DEPRECATED: This option might be removed in a future release.
   //
-  // true이면, 옵션 파일이 제대로 영속화되지 않은 경우 DB::Open,
-  // CreateColumnFamily, DropColumnFamily, SetOptions가 실패합니다.
+  // If true, then DB::Open, CreateColumnFamily, DropColumnFamily, and
+  // SetOptions will fail if options file is not properly persisted.
   //
-  // 기본값: true
+  // DEFAULT: true
   bool fail_if_options_file_error = true;
 
-  // true이면, rocksdb.stats와 함께 malloc 통계를 LOG에 출력합니다.
-  // 기본값: false
+  // If true, then print malloc stats together with rocksdb.stats
+  // when printing to LOG.
+  // DEFAULT: false
   bool dump_malloc_stats = false;
 
-  // 기본적으로 RocksDB는 WAL 로그를 재생하고 DB를 열 때 이를 플러시합니다. 이로
-  // 인해 매우 작은 SST 파일이 생성될 수 있습니다. 이 옵션이 활성화되면,
-  // RocksDB는 복구 중에 플러시를 피하려고 시도합니다(보장하지는 않음). 또한
-  // 기존의 WAL 로그는 유지되며, 플러시 전에 충돌이 발생하면 복구할 수 있는
-  // 로그가 여전히 존재합니다.
+  // By default RocksDB replay WAL logs and flush them on DB open, which may
+  // create very small SST files. If this option is enabled, RocksDB will try
+  // to avoid (but not guarantee not to) flush during recovery. Also, existing
+  // WAL logs will be kept, so that if crash happened before flush, we still
+  // have logs to recover from.
   //
-  // 기본값: false
+  // DEFAULT: false
   bool avoid_flush_during_recovery = false;
 
-  // 기본적으로 RocksDB는 DB를 닫을 때 모든 memtable을 플러시합니다. (WAL이
-  // 비활성화된 경우) 플러시를 건너뛰어 DB 종료 속도를 높일 수 있습니다.
-  // 플러시되지 않은 데이터는 손실됩니다.
+  // By default RocksDB will flush all memtables on DB close if there are
+  // unpersisted data (i.e. with WAL disabled) The flush can be skip to speedup
+  // DB close. Unpersisted data WILL BE LOST.
   //
-  // 기본값: false
+  // DEFAULT: false
   //
-  // SetDBOptions() API를 통해 동적으로 변경 가능
+  // Dynamically changeable through SetDBOptions() API.
   bool avoid_flush_during_shutdown = false;
 
-  // 데이터베이스 생성 시 이 옵션을 true로 설정하면, IngestExternalFile()을
-  // 사용하여 이미 존재하는 키를 건너뛰고 (매칭되는 키를 덮어쓰지 않고) 외부
-  // 파일을 수집할 수 있습니다. 이 옵션을 true로 설정하면 다음과 같은 영향을
-  // 미칩니다: 1) SST 파일 압축에 대한 일부 내부 최적화가 비활성화됩니다. 2)
-  // 마지막 레벨을 수집된 파일 전용으로 예약합니다. 3) 컴팩션은 마지막 레벨의
-  // 파일을 포함하지 않습니다. 이 기능은 오직 유니버설 컴팩션에서만 지원됩니다.
-  // `num_levels`는 이 옵션을 활성화하면 3 이상이어야 합니다.
+  // Set this option to true during creation of database if you want
+  // to be able to ingest behind (call IngestExternalFile() skipping keys
+  // that already exist, rather than overwriting matching keys).
+  // Setting this option to true has the following effects:
+  // 1) Disable some internal optimizations around SST file compression.
+  // 2) Reserve the last level for ingested files only.
+  // 3) Compaction will not include any file from the last level.
+  // Note that only Universal Compaction supports allow_ingest_behind.
+  // `num_levels` should be >= 3 if this option is turned on.
   //
-  // 기본값: false
-  // 불변
+  //
+  // DEFAULT: false
+  // Immutable.
   bool allow_ingest_behind = false;
 
-  // 활성화하면 쓰기를 위한 두 개의 큐를 사용합니다. 하나는 disable_memtable이
-  // 설정된 쓰기, 다른 하나는 memtable에도 쓰는 쓰기를 위한 큐입니다. 이를 통해
-  // memtable 쓰기가 다른 쓰기보다 뒤처지지 않도록 할 수 있습니다. 이는 MySQL
-  // 2PC 최적화에 사용될 수 있으며, 여기서는 오직 커밋만이 (직렬로) memtable에
-  // 쓰여집니다.
+  // If enabled it uses two queues for writes, one for the ones with
+  // disable_memtable and one for the ones that also write to memtable. This
+  // allows the memtable writes not to lag behind other writes. It can be used
+  // to optimize MySQL 2PC in which only the commits, which are serial, write to
+  // memtable.
   bool two_write_queues = false;
 
-  // true이면, 각 쓰기 후 WAL이 자동으로 플러시되지 않습니다. 대신, FlushWAL을
-  // 수동으로 호출하여 WAL 버퍼를 파일에 쓰게 됩니다.
+  // If true WAL is not flushed automatically after each write. Instead it
+  // relies on manual invocation of FlushWAL to write the WAL buffer to its
+  // file.
   bool manual_wal_flush = false;
 
-  // 활성화하면 WAL 기록이 쓰기 전에 압축됩니다. 현재 지원되는 압축 방식은
-  // ZSTD(= kZSTD)뿐입니다. (다른 압축 유형에 대한 스트리밍 지원이 추가될
-  // 때까지). 압축된 WAL 기록은 해당 WAL이 읽힐 때 (RocksDB 7.4.0 이상에서 ZSTD
-  // 지원) 이 설정에 관계없이 읽힙니다.
+  // If enabled WAL records will be compressed before they are written. Only
+  // ZSTD (= kZSTD) is supported (until streaming support is adapted for other
+  // compression types). Compressed WAL records will be read in supported
+  // versions (>= RocksDB 7.4.0 for ZSTD) regardless of this setting when
+  // the WAL is read.
   CompressionType wal_compression = kNoCompression;
 
-  // true로 설정하면, 이전 동작을 재설정하여 완료된 동기화된 WAL 파일을 배경
-  // 스레드에서 삭제되기 전까지 쓰기용으로 열어 둡니다. 파일 Close()에 성능
-  // 문제가 없다면 이 옵션을 활성화할 필요는 없습니다. true로 설정하면,
-  // Checkpoint가 여전히 쓰기용으로 열려 있는 WAL에 대해 LinkFile을 호출할 수
-  // 있습니다. 이는 일부 파일 시스템 구현에서는 지원되지 않을 수 있습니다. 이
-  // 옵션은 임시 비활성화 스위치로 의도되었으므로 이미 DEPRECATED입니다.
+  // Set to true to re-instate an old behavior of keeping complete, synced WAL
+  // files open for write until they are collected for deletion by a
+  // background thread. This should not be needed unless there is a
+  // performance issue with file Close(), but setting it to true means that
+  // Checkpoint might call LinkFile on a WAL still open for write, which might
+  // be unsupported on some FileSystem implementations. As this is intended as
+  // a temporary kill switch, it is already DEPRECATED.
   bool background_close_inactive_wals = false;
 
-  // true이면, RocksDB는 여러 컬럼 패밀리를 플러시하고 그 결과를 MANIFEST에
-  // 원자적으로 커밋하는 것을 지원합니다. WAL이 항상 활성화된 경우에는
-  // atomic_flush를 true로 설정할 필요가 없으며, WAL은 DB를 마지막 영속 상태로
-  // 복구할 수 있도록 합니다. 이 옵션은 WAL로 보호되지 않는 쓰기가 있는 컬럼
-  // 패밀리가 있을 때 유용합니다. 수동 플러시에서는 애플리케이션이 DB::Flush에서
-  // 원자적으로 플러시할 컬럼 패밀리를 지정해야 합니다. 자동으로 트리거된
-  // 플러시에서는 RocksDB가 모든 컬럼 패밀리를 원자적으로 플러시합니다.
+  // If true, RocksDB supports flushing multiple column families and committing
+  // their results atomically to MANIFEST. Note that it is not
+  // necessary to set atomic_flush to true if WAL is always enabled since WAL
+  // allows the database to be restored to the last persistent state in WAL.
+  // This option is useful when there are column families with writes NOT
+  // protected by WAL.
+  // For manual flush, application has to specify which column families to
+  // flush atomically in DB::Flush.
+  // For auto-triggered flush, RocksDB atomically flushes ALL column families.
   //
-  // 현재, atomic_flush 이후의 모든 WAL 활성화된 쓰기는 프로세스가 충돌하고
-  // 복구하려 할 때 독립적으로 재생될 수 있습니다.
+  // Currently, any WAL-enabled writes after atomic flush may be replayed
+  // independently if the process crashes later and tries to recover.
   bool atomic_flush = false;
 
-  // true이면, 작업 스레드는 불필요하고 긴 지연 시간을 초래하는 작업(예:
-  // 불필요한 파일 삭제 또는 memtable 삭제)을 피하고 대신 백그라운드 작업으로
-  // 예약합니다. 지연 시간에 민감한 경우에 사용하세요. true로 설정되면,
-  // ReadOptions::background_purge_on_iterator_cleanup보다 우선합니다.
+  // If true, working thread may avoid doing unnecessary and long-latency
+  // operation (such as deleting obsolete files directly or deleting memtable)
+  // and will instead schedule a background job to do it.
+  // Use it if you're latency-sensitive.
+  // If set to true, takes precedence over
+  // ReadOptions::background_purge_on_iterator_cleanup.
   bool avoid_unnecessary_blocking_io = false;
 
-  // DB 고유 ID는 DB 매니페스트(선호됨, 이 옵션) 또는 IDENTITY 파일(역사적, 더
-  // 이상 사용되지 않음), 또는 둘 다에 기록될 수 있습니다. 이 옵션이 false로
-  // 설정되면(구 버전) write_identity_file을 true로 설정해야 합니다.
-  // 매니페스트가 선호되는 이유는
-  // 1. IDENTITY 파일은 체크섬이 없으므로 손상에 대해 덜 안전합니다.
-  // 2. IDENTITY 파일은 DB와 함께 복사되지 않을 수 있습니다(예: BackupEngine에서
-  // 복사하지 않음),
-  //    따라서 DB의 출처를 신뢰할 수 없습니다.
-  // 이 옵션은 결국 구식이 되어 Identity 파일이 폐지될 때 제거될 수 있습니다.
+  // The DB unique ID can be saved in the DB manifest (preferred, this option)
+  // or an IDENTITY file (historical, deprecated), or both. If this option is
+  // set to false (old behavior), then write_identity_file must be set to true.
+  // The manifest is preferred because
+  // 1. The IDENTITY file is not checksummed, so it is not as safe against
+  //    corruption.
+  // 2. The IDENTITY file may or may not be copied with the DB (e.g. not
+  //    copied by BackupEngine), so is not reliable for the provenance of a DB.
+  // This option might eventually be obsolete and removed as Identity files
+  // are phased out.
   bool write_dbid_to_manifest = true;
 
-  // Identity 파일은 매니페스트에 DB ID를 기록하는 것으로 폐지될 것으로
-  // 예상됩니다. 이를 true로 설정하면 Identity 파일을 기록하는 이전 동작을
-  // 유지하며, false로 설정하면 미래의 기본값으로 설정될 것으로 예상됩니다. 이
-  // 옵션은 결국 구식이 되어 Identity 파일이 폐지될 때 제거될 수 있습니다.
+  // It is expected that the Identity file will be obsoleted by recording
+  // DB ID in the manifest (see write_dbid_to_manifest). Setting this to true
+  // maintains the historical behavior of writing an Identity file, while
+  // setting to false is expected to be the future default. This option might
+  // eventually be obsolete and removed as Identity files are phased out.
   bool write_identity_file = true;
 
-  // 활성화하면 prefix_extractor가 nullptr이 아닐 때, 반복자는 불행히도
-  // *가능하게* 같은 접두사 내에서만 데이터를 반환하는 기본 동작을 합니다.
-  // "거리에서의 유령 같은 작용(spooky action at a distance)"을 피하기 위해,
-  // 반복자 범위는 반복자를 생성하거나 탐색할 때 설정해야 하며, 변경 가능한 컬럼
-  // 패밀리 옵션에서 유래된 것이 아니어야 합니다.
+  // Historically, when prefix_extractor != nullptr, iterators have an
+  // unfortunate default semantics of *possibly* only returning data
+  // within the same prefix. To avoid "spooky action at a distance," iterator
+  // bounds should come from the instantiation or seeking of the iterator,
+  // not from a mutable column family option.
   //
-  // true로 설정하면, 모든 반복자가 total_order_seek=true로 생성된 것처럼
-  // 취급되며, auto_prefix_mode=true와 prefix_same_as_start=true만 접두사 탐색
-  // 최적화를 활용할 수 있습니다.
+  // When set to true, it is as if every iterator is created with
+  // total_order_seek=true and only auto_prefix_mode=true and
+  // prefix_same_as_start=true can take advantage of prefix seek optimizations.
   bool prefix_seek_opt_in_only = false;
 
-  // 로그를 읽을 때 미리 가져올 바이트 수입니다. 이는 원격 위치에 있는 로그를
-  // 읽을 때 유용하며, 왕복 횟수를 줄일 수 있습니다. 0이면 미리 가져오기가
-  // 비활성화됩니다.
+  // The number of bytes to prefetch when reading the log. This is mostly useful
+  // for reading a remotely located log, as it can save the number of
+  // round-trips. If 0, then the prefetching is disabled.
   //
-  // 기본값: 0
+  // Default: 0
   size_t log_readahead_size = 0;
 
-  // 사용자가 체크섬 생성기 팩토리를 제공하지 않으면, 파일 체크섬은 사용되지
-  // 않습니다. 새로운 파일 체크섬 생성기 객체는 SST 파일이 생성될 때마다
-  // 만들어집니다. 따라서 각 생성된 FileChecksumGenerator는 단일 스레드에서만
-  // 사용되므로 스레드 안전성을 필요로 하지 않습니다.
+  // If user does NOT provide the checksum generator factory, the file checksum
+  // will NOT be used. A new file checksum generator object will be created
+  // when a SST file is created. Therefore, each created FileChecksumGenerator
+  // will only be used from a single thread and so does not need to be
+  // thread-safe.
   //
-  // 기본값: nullptr
+  // Default: nullptr
   std::shared_ptr<FileChecksumGenFactory> file_checksum_gen_factory = nullptr;
 
-  // 기본적으로, RocksDB는 DB 파일에서 데이터 손실이나 손상을 감지하여
-  // 사용자에게 오류를 반환하려고 시도합니다. 이 정책의 예외는 WAL 파일로, 해당
-  // 복구는 wal_recovery_mode 옵션에 의해 제어됩니다.
+  // By default, RocksDB will attempt to detect any data losses or corruptions
+  // in DB files and return an error to the user, either at DB::Open time or
+  // later during DB operation. The exception to this policy is the WAL file,
+  // whose recovery is controlled by the wal_recovery_mode option.
   //
-  // Best-efforts 복구(이 옵션이 true로 설정됨)는 각 컬럼 패밀리의 시점에서
-  // 유효한 상태로 DB를 여는 것을 선호하는 방식입니다. 기본적으로는 WAL이 아닌
-  // 데이터 손실을 사용자에게 오류로 반환하지만, 이 옵션을 통해 빈/새로운 상태를
-  // 포함한 시점에 유효한 상태를 복구하려고 시도합니다. RocksDB 사용자 데이터
-  // 측면에서 이는 WALRecoveryMode::kPointInTimeRecovery를 각 컬럼 패밀리에
-  // 적용하는 것과 같습니다.
+  // Best-efforts recovery (this option set to true) signals a preference for
+  // opening the DB to any point-in-time valid state for each column family,
+  // including the empty/new state, versus the default of returning non-WAL
+  // data losses to the user as errors. In terms of RocksDB user data, this
+  // is like applying WALRecoveryMode::kPointInTimeRecovery to each column
+  // family rather than just the WAL.
   //
-  // "AtomicGroup"이 MANIFEST에 존재하면, 이는 현재 `atomic_flush == true`인
-  // 경우에만 적용됩니다. 그 경우, 모든 기존 CF가 해당 그룹을 복구해야만 해당
-  // 그룹이 모두 일괄적으로 적용될 수 있습니다. 이로 인해 유효하지 않은 파일
-  // 시스템 상태를 가진 비활성 CF가 있으면 해당 CF들의 복구를 차단할 수
-  // 있습니다.
+  // The behavior changes in the presence of "AtomicGroup"s in the MANIFEST,
+  // which is currently only the case when `atomic_flush == true`. In that
+  // case, all pre-existing CFs must recover the atomic group in order for
+  // that group to be applied in an all-or-nothing manner. This means that
+  // unused/inactive CF(s) with invalid filesystem state can block recovery of
+  // all other CFs at an atomic group.
   //
-  // Best-efforts 복구(BER)는 DB 파일이 누락되거나 크기가 잘리면서 일부 크기만
-  // 남은 경우를 복구하도록 설계되었습니다. BER은 SST 파일이 다른 파일로
-  // 교체되었는지도 감지할 수 있습니다(단, DB 매니페스트에서 SST 고유 ID가
-  // 추적되는 경우). BER은 DB 파일의 다른 손상(일반적으로 DB::VerifyChecksum()로
-  // 감지 가능)에는 대응하지 않으며, WAL 파일의 복구도 시도하지 않습니다.
+  // Best-efforts recovery (BER) is specifically designed to recover a DB with
+  // files that are missing or truncated to some smaller size, such as the
+  // result of an incomplete DB "physical" (FileSystem) copy. BER can also
+  // detect when an SST file has been replaced with a different one of the
+  // same size (assuming SST unique IDs are tracked in DB manifest).
+  // BER is not yet designed to produce a usable DB from other corruptions to
+  // DB files (which should generally be detectable by DB::VerifyChecksum()),
+  // and BER does not yet attempt to recover any WAL files.
   //
-  // 예를 들어, MANIFEST에서 참조된 SST 또는 blob 파일이 누락된 경우, BER은 해당
-  // 컬럼 패밀리의 "시점" 버전과 일치하는 파일 집합을 찾을 수 있습니다. 이
-  // 버전은 이전 MANIFEST 파일에서 올 수 있습니다. 또한, L0 파일의 접미사만
-  // 누락된 불완전한 버전도 복구할 수 있습니다. 사용자의 관점에서 보면, L0
-  // 파일의 접미사 누락은 사용자가 최근에 쓴 데이터를 놓친 것을 의미합니다.
-  // 하지만 남은 파일들은 여전히 유효한 시점의 뷰를 제공합니다. atomic
-  // flush에서는 모든 컬럼 패밀리에서 일관된 뷰가 보장되지만, 불완전한 버전
-  // 복구에서는 그 보장이 되지 않습니다. `ldb repair`와는 달리 BER은 적어도
-  // 하나의 유효한 MANIFEST 파일이 있어야 복구가 가능합니다.
+  // For example, if an SST or blob file referenced by the MANIFEST is missing,
+  // BER might be able to find a set of files corresponding to an old "point in
+  // time" version of the column family, possibly from an older MANIFEST
+  // file.
+  // Besides complete "point in time" version, an incomplete version with
+  // only a suffix of L0 files missing can also be recovered to if the
+  // versioning history doesn't include an atomic flush.  From the users'
+  // perspective, missing a suffix of L0 files means missing the
+  // user's most recently written data. So the remaining available files still
+  // presents a valid point in time view, although for some previous time. It's
+  // not done for atomic flush because that guarantees a consistent view across
+  // column families. We cannot guarantee that if recovering an incomplete
+  // version.
+  // Some other kinds of DB files (e.g. CURRENT, LOCK, IDENTITY) are
+  // either ignored or replaced with BER, or quietly fixed regardless of BER
+  // setting. BER does require at least one valid MANIFEST to recover to a
+  // non-trivial DB state, unlike `ldb repair`.
   //
-  // 기본값: false
+  // Default: false
   bool best_efforts_recovery = false;
 
-  // 배경에서 재시도 가능한 I/O 오류가 발생할 때 별도의 스레드에서
-  // DB::Resume()을 호출하는 횟수를 정의합니다. 배경에서 재시도 가능한 I/O
-  // 오류가 발생하면 SetBGError가 호출되어 오류를 처리합니다. 오류가 자동으로
-  // 복구될 수 있으면(예: Flush 또는 WAL 쓰기 중 재시도 가능한 I/O 오류), DB는
-  // 배경에서 오류를 복구하기 위해 DB::Resume을 호출합니다. 이 값이 0 또는
-  // 음수이면 DB::Resume()은 자동으로 호출되지 않습니다.
+  // It defines how many times DB::Resume() is called by a separate thread when
+  // background retryable IO Error happens. When background retryable IO
+  // Error happens, SetBGError is called to deal with the error. If the error
+  // can be auto-recovered (e.g., retryable IO Error during Flush or WAL write),
+  // then db resume is called in background to recover from the error. If this
+  // value is 0 or negative, DB::Resume() will not be called automatically.
   //
-  // 기본값: INT_MAX
+  // Default: INT_MAX
   int max_bgerror_resume_count = INT_MAX;
 
-  // max_bgerror_resume_count가 2 이상이면 DB가 여러 번 재개됩니다.
-  // 이 옵션은 이전 재개가 실패하고 재개 조건을 만족할 경우, 다음 재개를 얼마나
-  // 기다릴지 결정합니다.
+  // If max_bgerror_resume_count is >= 2, db resume is called multiple times.
+  // This option decides how long to wait to retry the next resume if the
+  // previous resume fails and satisfy redo resume conditions.
   //
-  // 기본값: 1000000 (마이크로초)
+  // Default: 1000000 (microseconds).
   uint64_t bgerror_resume_retry_interval = 1000000;
 
-  // 손상된 키/값을 포함하는 오류 메시지를 받도록 사용자가 선택할 수 있게
-  // 합니다. 손상된 키와 값은 메시지/로그/상태에 기록되며, 사용자에게 영향을
-  // 받는 데이터에 관한 유용한 정보를 제공합니다. 기본값은 false로 설정되어 있어
-  // 사용자 데이터를 로그/메시지에 노출시키지 않도록 방지합니다.
+  // It allows user to opt-in to get error messages containing corrupted
+  // keys/values. Corrupt keys, values will be logged in the
+  // messages/logs/status that will help users with the useful information
+  // regarding affected data. By default value is set false to prevent users
+  // data to be exposed in the logs/messages etc.
   //
-  // 기본값: false
+  // Default: false
   bool allow_data_in_errors = false;
 
-  // DB가 호스팅된 머신을 식별하는 문자열입니다. 이 문자열은 DB가 쓴 모든 SST
-  // 파일에 속성으로 기록됩니다. 이 속성은 파일을 쓸 때 실패하는 호스트가 메모리
-  // 손상으로 인해 문제가 발생한 경우, 해당 호스트로 추적하여 문제를 해결하는 데
-  // 유용할 수 있습니다. 이러한 손상은 체크섬으로는 포착되지 않기 때문에, 실제
-  // 호스트 이름으로 이 속성을 대체하여 SST 파일을 기록합니다. 기본값으로 두면,
-  // 테이블 작성자는 실제 호스트 이름으로 이를 대체하여 SST 파일을 기록합니다.
-  // 빈 문자열로 설정하면 이 속성은 SST 파일에 기록되지 않습니다.
+  // A string identifying the machine hosting the DB. This
+  // will be written as a property in every SST file written by the DB (or
+  // by offline writers such as SstFileWriter and RepairDB). It can be useful
+  // for troubleshooting in memory corruption caused by a failing host when
+  // writing a file, by tracing back to the writing host. These corruptions
+  // may not be caught by the checksum since they happen before checksumming.
+  // If left as default, the table writer will substitute it with the actual
+  // hostname when writing the SST file. If set to an empty string, the
+  // property will not be written to the SST file.
   //
-  // 기본값: hostname
+  // Default: hostname
   std::string db_host_id = kHostnameForDbHostId;
 
-  // DB에서 특정 파일 유형의 쓰기 시 체크섬 이양을 활성화하려면 이 옵션을
-  // 사용하세요. 사용하는 파일 시스템이 crc32c 체크섬 검증을 지원하는지
-  // 확인하세요. 현재 지원되는 파일 유형: kWALFile, kTableFile, kDescriptorFile.
-  // NOTE: 현재 RocksDB는 이양을 위한 crc32c 기반 체크섬만 생성합니다.
-  // 저장소 계층이 다른 체크섬을 지원하는 경우, 사용자는 이 설정을 비워두어야
-  // 합니다. 그렇지 않으면 예기치 않은 쓰기 실패가 발생할 수 있습니다.
+  // Use this if your DB want to enable checksum handoff for specific file
+  // types writes. Make sure that the File_system you use support the
+  // crc32c checksum verification
+  // Currently supported file tyes: kWALFile, kTableFile, kDescriptorFile.
+  // NOTE: currently RocksDB only generates crc32c based checksum for the
+  // handoff. If the storage layer has different checksum support, user
+  // should enble this set as empty. Otherwise,it may cause unexpected
+  // write failures.
   FileTypeSet checksum_handoff_file_types;
 
-  // 실험적
-  // CompactionService는 사용자가 다른 호스트나 프로세스에서 컴팩션을 실행할 수
-  // 있는 기능으로, 기본 호스트의 백그라운드 로드를 분산시킵니다. 이 기능은
-  // 실험적이며, 인터페이스는 현재 후방/전방 호환성 없이 변경될 수 있습니다.
-  // 일부 알려진 문제는 아직 개발 중입니다.
+  // EXPERIMENTAL
+  // CompactionService is a feature allows the user to run compactions on a
+  // different host or process, which offloads the background load from the
+  // primary host.
+  // It's an experimental feature, the interface will be changed without
+  // backward/forward compatibility support for now. Some known issues are still
+  // under development.
   std::shared_ptr<CompactionService> compaction_service = nullptr;
 
-  // 특정 DB에 대해 어떤 최하위 캐시 계층을 사용할지 나타냅니다.
-  // 현재 volatile_tier와 non_volatile_tier가 지원됩니다. 이들은 계층화되어
-  // 있습니다. kVolatileTier로 설정하면, 현재 구현된 volatile_tier인 블록 캐시만
-  // 사용됩니다. 따라서 캐시 항목은 보조 캐시(non_volatile_tier)에 넘겨지지
-  // 않으며, 블록 캐시 조회 실패는 보조 캐시에서 조회되지 않습니다.
-  // kNonVolatileBlockTier가 사용되면, 블록 캐시와 보조 캐시를 모두 사용합니다.
+  // It indicates, which lowest cache tier we want to
+  // use for a certain DB. Currently we support volatile_tier and
+  // non_volatile_tier. They are layered. By setting it to kVolatileTier, only
+  // the block cache (current implemented volatile_tier) is used. So
+  // cache entries will not spill to secondary cache (current
+  // implemented non_volatile_tier), and block cache lookup misses will not
+  // lookup in the secondary cache. When kNonVolatileBlockTier is used, we use
+  // both block cache and secondary cache.
   //
-  // 기본값: kNonVolatileBlockTier
+  // Default: kNonVolatileBlockTier
   CacheTier lowest_used_cache_tier = CacheTier::kNonVolatileBlockTier;
 
-  // 더 이상 사용되지 않음: 이 옵션은 향후 릴리스에서 제거될 수 있습니다.
+  // DEPRECATED: This option might be removed in a future release.
   //
-  // false로 설정되면, 컴팩션이나 플러시가 동일한 사용자 키에 대해 SingleDelete
-  // 후 Delete가 발견되면 컴팩션 작업이 실패하지 않습니다. 그렇지 않으면 컴팩션
-  // 작업이 실패합니다. 이는 기존 사용 사례가 마이그레이션할 수 있도록 돕는 임시
-  // 옵션이며, 향후 릴리스에서 제거될 예정입니다. 경고: 이 값을 false로 설정하지
-  // 마세요. 단, SingleDelete 계약이 강제되지 않아
-  // (https://github.com/facebook/rocksdb/wiki/Single-Delete) 동일한 사용자 키에
-  // 대해 Delete와 SingleDelete가 혼합된 기존 데이터를 마이그레이션하려는
-  // 경우에만 설정하십시오. 계약 위반은 예기치 않은 동작을 초래하며 데이터
-  // 불일치가 발생할 수 있습니다. 예를 들어, 삭제된 이전 데이터가 다시 보이게
-  // 되는 등의 문제가 발생할 수 있습니다.
+  // If set to false, when compaction or flush sees a SingleDelete followed by
+  // a Delete for the same user key, compaction job will not fail.
+  // Otherwise, compaction job will fail.
+  // This is a temporary option to help existing use cases migrate, and
+  // will be removed in a future release.
+  // Warning: do not set to false unless you are trying to migrate existing
+  // data in which the contract of single delete
+  // (https://github.com/facebook/rocksdb/wiki/Single-Delete) is not enforced,
+  // thus has Delete mixed with SingleDelete for the same user key. Violation
+  // of the contract leads to undefined behaviors with high possibility of data
+  // inconsistency, e.g. deleted old data become visible again, etc.
   bool enforce_single_del_contracts = true;
 
-  // RocksDB에서 비수기 시간 인식 구현. 여기서 "비수기 시간"은 다른 시간에 비해
-  // 읽기와 쓰기 활동이 상당히 적은 기간을 의미합니다. 이 지식을 활용하여 TTL
-  // 기반 컴팩션과 같은 낮은 우선순위 작업이 피크 시간대 동안 읽기 및 쓰기
-  // 작업과 경쟁하지 않도록 할 수 있습니다. 본질적으로 이러한 작업을 피크 주기가
-  // 시작되기 전 비수기 시간에 미리 처리합니다. 예를 들어, TTL이 25일로 설정되어
-  // 있으면 24일의 비수기 시간에 파일을 컴팩트할 수 있습니다.
+  // Implementing off-peak duration awareness in RocksDB. In this context,
+  // "off-peak time" signifies periods characterized by significantly less read
+  // and write activity compared to other times. By leveraging this knowledge,
+  // we can prevent low-priority tasks, such as TTL-based compactions, from
+  // competing with read and write operations during peak hours. Essentially, we
+  // preprocess these tasks during the preceding off-peak period, just before
+  // the next peak cycle begins. For example, if the TTL is configured for 25
+  // days, we may compact the files during the off-peak hours of the 24th day.
   //
-  // UTC 기준 하루 중 시간, 시작 시간-끝 시간 포함.
-  // 형식 - HH:mm-HH:mm (00:00-23:59)
-  // 시작 시간이 끝 시간보다 크면, 이 기간이 다음 날로 이어진다고 간주됩니다
-  // (예: 23:30-04:00). 하루를 비수기로 만들려면 "0:00-23:59"를 사용하세요.
-  // 비수기 시간을 설정하지 않으려면 이 필드를 비워두세요. 기본값: 빈 문자열
-  // (비수기 없음)
+  // Time of the day in UTC, start_time-end_time inclusive.
+  // Format - HH:mm-HH:mm (00:00-23:59)
+  // If the start time > end time, it will be considered that the time period
+  // spans to the next day (e.g., 23:30-04:00). To make an entire day off-peak,
+  // use "0:00-23:59". To make an entire day have no offpeak period, leave
+  // this field blank. Default: Empty string (no offpeak).
   std::string daily_offpeak_time_utc = "";
 
-  // 실험적
+  // EXPERIMENTAL
 
-  // RocksDB 데이터베이스가 팔로워 모드로 열릴 때, 이 옵션은 사용자가 팔로워가
-  // 리더의 상태를 새로 고치는 빈도를 요청하는 데 사용됩니다. RocksDB는
-  // 데이터베이스 상태에 변화가 감지되면 더 자주 동기화를 시도할 수 있습니다.
-  // 기본값은 10초마다.
+  // When a RocksDB database is opened in follower mode, this option
+  // is set by the user to request the frequency of the follower
+  // attempting to refresh its view of the leader. RocksDB may choose to
+  // trigger catch ups more frequently if it detects any changes in the
+  // database state.
+  // Default every 10s.
   uint64_t follower_refresh_catchup_period_ms = 10000;
 
-  // 주어진 동기화 시도에서, 이 옵션은 새로운 일관된 버전을 설치하려고 시도하는
-  // 횟수를 지정합니다. 매우 드물지만, 리더가 LSM을 매우 높은 속도로 변형하고
-  // 팔로워가 일관된 뷰를 얻을 수 없는 경우 동기화가 실패할 수 있습니다.
-  // 기본값은 10번 시도
+  // For a given catch up attempt, this option specifies the number of times
+  // to tail the MANIFEST and try to install a new, consistent  version before
+  // giving up. Though it should be extremely rare, the catch up may fail if
+  // the leader is mutating the LSM at a very high rate and the follower is
+  // unable to get a consistent view.
+  // Default to 10 attempts
   uint64_t follower_catchup_retry_count = 10;
 
-  // 연속된 동기화 시도 간의 대기 시간
-  // 기본값 100ms
+  // Time to wait between consecutive catch up attempts
+  // Default 100ms
   uint64_t follower_catchup_retry_wait_ms = 100;
 
-  // SST, blob, WAL 파일 외의 DB 파일이 생성될 때, 이 파일 시스템 온도를
-  // 사용합니다. (또한 `wal_write_temperature`와 다양한 `*_temperature` CF
-  // 옵션도 참조하세요.) `kUnknown`이 아닌 값으로 설정하면, 이는
-  // OptimizeForManifestWrite 함수에서 설정한 온도를 덮어씁니다.
+  // When DB files other than SST, blob and WAL files are created, use this
+  // filesystem temperature. (See also `wal_write_temperature` and various
+  // `*_temperature` CF options.) When not `kUnknown`, this overrides any
+  // temperature set by OptimizeForManifestWrite functions.
   Temperature metadata_write_temperature = Temperature::kUnknown;
 
-  // WAL 파일을 생성할 때 이 파일 시스템 온도를 사용합니다.
-  // `kUnknown`이 아닌 값으로 설정하면, 이는 OptimizeForLogWrite 함수에서 설정한
-  // 온도를 덮어씁니다.
+  // Use this filesystem temperature when creating WAL files. When not
+  // `kUnknown`, this overrides any temperature set by OptimizeForLogWrite
+  // functions.
   Temperature wal_write_temperature = Temperature::kUnknown;
-  // 실험적 끝
+  // End EXPERIMENTAL
 };
 
-// 데이터베이스의 동작을 제어하는 옵션 (DB::Open에 전달)
+// Options to control the behavior of a database (passed to DB::Open)
 struct Options : public DBOptions, public ColumnFamilyOptions {
-  // 모든 필드에 대한 기본값을 사용하여 Options 객체를 생성합니다.
+  // Create an Options object with default values for all fields.
   Options() : DBOptions(), ColumnFamilyOptions() {}
 
   Options(const DBOptions& db_options,
           const ColumnFamilyOptions& column_family_options)
       : DBOptions(db_options), ColumnFamilyOptions(column_family_options) {}
 
-  // 이전 버전에서 일부 기본값을 변경합니다.
-  // 더 이상 유지되지 않음: 이 함수는 유지되지 않으며 향후 릴리스에서 제거될 수
-  // 있습니다. 더 이상 사용되지 않음: 이 함수는 향후 릴리스에서 제거될 수
-  // 있습니다. 일반적으로 기본값은 광범위한 관심에 맞게 변경됩니다. 업그레이드
-  // 시 변경을 선택적으로 적용하려면 신중히 고려해야 합니다.
+  // Change to some default settings from an older version.
+  // NOT MAINTAINED: This function has not been and is not maintained.
+  // DEPRECATED: This function might be removed in a future release.
+  // In general, defaults are changed to suit broad interests. Opting
+  // out of a change on upgrade should be deliberate and considered.
   Options* OldDefaults(int rocksdb_major_version = 4,
                        int rocksdb_minor_version = 6);
 
@@ -1539,97 +1648,102 @@ struct Options : public DBOptions, public ColumnFamilyOptions {
 
   void DumpCFOptions(Logger* log) const;
 
-  // RocksDB 최적화를 쉽게 할 수 있는 일부 함수들
+  // Some functions that make it easier to optimize RocksDB
 
-  // 대량 로딩에 적합한 매개변수를 설정합니다.
-  // 이 함수가 "this"를 반환하는 이유는 미래에 유사한 여러 호출을 체이닝할 수
-  // 있도록 하기 위함입니다.
+  // Set appropriate parameters for bulk loading.
+  // The reason that this is a function that returns "this" instead of a
+  // constructor is to enable chaining of multiple similar calls in the future.
+  //
 
-  // 모든 데이터가 레벨 0에 있으며 자동 컴팩션 없이 저장됩니다.
-  // 데이터베이스에서 읽기 전에 CompactRange(NULL, NULL)을 수동으로 호출하는
-  // 것이 좋습니다. 그렇지 않으면 읽기가 매우 느릴 수 있습니다.
+  // All data will be in level 0 without any automatic compaction.
+  // It's recommended to manually call CompactRange(NULL, NULL) before reading
+  // from the database, because otherwise the read can be very slow.
   Options* PrepareForBulkLoad();
 
-  // DB가 매우 작고 (예: 1GB 이하) memtables에 많은 메모리를 소비하고 싶지 않은
-  // 경우 사용합니다.
+  // Use this if your DB is very small (like under 1GB) and you don't want to
+  // spend lots of memory for memtables.
   Options* OptimizeForSmallDb();
 
-  // 소프트웨어 논리 오류나 CPU+메모리 하드웨어 오류가 없는 경우 불필요한 일부
-  // 검사를 비활성화합니다. 이는 쓰기 속도를 개선할 수 있지만, 임시 용도로만
-  // 사용해야 합니다. 저장소의 손상에 대한 보호는 변경되지 않습니다 (예:
-  // verify_checksums).
+  // Disable some checks that should not be necessary in the absence of
+  // software logic errors or CPU+memory hardware errors. This can improve
+  // write speeds but is only recommended for temporary use. Does not
+  // change protection against corrupt storage (e.g. verify_checksums).
   Options* DisableExtraChecks();
 };
 
-// 애플리케이션은 읽기 요청(Get/Iterator)을 발행할 수 있으며,
-// 해당 읽기가 지정된 캐시 레벨에 이미 존재하는 데이터를 처리해야 하는지 여부를
-// 지정할 수 있습니다. 예를 들어, 애플리케이션이 kBlockCacheTier를 지정하면, Get
-// 호출은 이미 memtable이나 블록 캐시에 처리된 데이터를 처리합니다. OS 캐시에서
-// 데이터를 가져오거나 저장소에 있는 데이터를 페이지로 가져오지 않습니다.
+// An application can issue a read request (via Get/Iterators) and specify
+// if that read should process data that ALREADY resides on a specified cache
+// level. For example, if an application specifies kBlockCacheTier then the
+// Get call will process data that is already processed in the memtable or
+// the block cache. It will not page in data from the OS cache or data that
+// resides in storage.
 enum ReadTier {
-  kReadAllTier =
-      0x0,  // memtable, block cache, OS cache 또는 저장소에 있는 데이터
-  kBlockCacheTier = 0x1,  // memtable 또는 block cache에 있는 데이터
-  kPersistedTier =
-      0x2,  // 영속적인 데이터. WAL이 비활성화되면 이 옵션은 memtable의 데이터를
-            // 건너뜁니다. 현재 이 ReadTier는 Get과 MultiGet만 지원하고,
-            // iterators는 지원하지 않습니다.
-  kMemtableTier =
-      0x3  // memtable에 있는 데이터. memtable 전용 iterator에서 사용됩니다.
+  kReadAllTier = 0x0,     // data in memtable, block cache, OS cache or storage
+  kBlockCacheTier = 0x1,  // data in memtable or block cache
+  kPersistedTier = 0x2,   // persisted data.  When WAL is disabled, this option
+                          // will skip data in memtable.
+                          // Note that this ReadTier currently only supports
+                          // Get and MultiGet and does not support iterators.
+  kMemtableTier = 0x3     // data in memtable. used for memtable-only iterators.
 };
 
-// 읽기 작업의 동작을 제어하는 옵션들
+// Options that control read operations
 struct ReadOptions {
-  // *** 포인트 조회 및 스캔에 관련된 옵션들 ***
+  // *** BEGIN options relevant to point lookups as well as scans ***
 
-  // "snapshot"이 nullptr이 아니면, 지정된 스냅샷으로 읽기를 수행합니다.
-  // (스냅샷은 읽고 있는 DB에 속해야 하며, 이미 해제되지 않아야 합니다).
-  // "snapshot"이 nullptr이면, 이 읽기 작업의 시작 시점에서 암시적 스냅샷을
-  // 사용합니다.
+  // If "snapshot" is non-nullptr, read as of the supplied snapshot
+  // (which must belong to the DB that is being read and which must
+  // not have been released).  If "snapshot" is nullptr, use an implicit
+  // snapshot of the state at the beginning of this read operation.
   const Snapshot* snapshot = nullptr;
 
-  // 작업의 타임스탬프입니다. 읽기는 지정된 타임스탬프에서 볼 수 있는 최신
-  // 데이터를 반환해야 합니다. 동일한 데이터베이스의 모든 타임스탬프는 같은
-  // 길이와 형식을 가져야 합니다. 사용자는 Comparator를 통해 <key, timestamp>
-  // 튜플을 비교하는 맞춤 비교 함수를 제공해야 합니다. iterator의 경우,
-  // iter_start_ts는 하한선(더 오래된 데이터)이고, timestamp는 상한선 역할을
-  // 합니다. 타임스탬프 범위에 포함되는 동일한 레코드 버전들이 반환됩니다.
-  // iter_start_ts가 nullptr이면, 타임스탬프에서 볼 수 있는 가장 최근 버전만
-  // 반환됩니다. 사용자 지정 타임스탬프 기능은 현재 활성 개발 중이며, API는
-  // 변경될 수 있습니다.
+  // Timestamp of operation. Read should return the latest data visible to the
+  // specified timestamp. All timestamps of the same database must be of the
+  // same length and format. The user is responsible for providing a customized
+  // compare function via Comparator to order <key, timestamp> tuples.
+  // For iterator, iter_start_ts is the lower bound (older) and timestamp
+  // serves as the upper bound. Versions of the same record that fall in
+  // the timestamp range will be returned. If iter_start_ts is nullptr,
+  // only the most recent version visible to timestamp is returned.
+  // The user-specified timestamp feature is still under active development,
+  // and the API is subject to change.
   const Slice* timestamp = nullptr;
   const Slice* iter_start_ts = nullptr;
 
-  // API 호출(Get/MultiGet/Seek/Next)의 완료 기한을 마이크로초 단위로
-  // 설정합니다. 이는 epoch 이후 마이크로초로 설정되어야 하며, 즉, gettimeofday
-  // 또는 동등한 방식에 허용된 시간을 더한 값입니다. 최선의 방법은
-  // env->NowMicros() + 일부 타임아웃을 사용하는 것입니다. 이는 최선의 노력이며,
-  // 파일 시스템이 기한을 지원하지 않거나 배치 처리 시 모든 키에 대해 기한을
-  // 확인하지 않으면 기한을 초과할 수 있습니다.
+  // Deadline for completing an API call (Get/MultiGet/Seek/Next for now)
+  // in microseconds.
+  // It should be set to microseconds since epoch, i.e, gettimeofday or
+  // equivalent plus allowed duration in microseconds. The best way is to use
+  // env->NowMicros() + some timeout.
+  // This is best efforts. The call may exceed the deadline if there is IO
+  // involved and the file system doesn't support deadlines, or due to
+  // checking for deadline periodically rather than for every key if
+  // processing a batch
   std::chrono::microseconds deadline = std::chrono::microseconds::zero();
 
-  // 파일 시스템에 전달할 읽기 타임아웃을 마이크로초 단위로 설정합니다.
-  // deadline과 달리, 이 값은 각 개별 파일 읽기 요청에 대한 타임아웃을
-  // 설정합니다. MultiGet/Get/Seek/Next 호출이 여러 개의 읽기를 결과로 낳는
-  // 경우, 각 읽기는 최대 io_timeout까지 지속될 수 있습니다.
+  // A timeout in microseconds to be passed to the underlying FileSystem for
+  // reads. As opposed to deadline, this determines the timeout for each
+  // individual file read request. If a MultiGet/Get/Seek/Next etc call
+  // results in multiple reads, each read can last up to io_timeout us.
   std::chrono::microseconds io_timeout = std::chrono::microseconds::zero();
 
-  // 이 읽기 요청이 특정 캐시에서 이미 존재하는 데이터를 처리해야 하는지
-  // 지정합니다. 지정된 캐시에서 필요한 데이터를 찾을 수 없으면
-  // Status::Incomplete가 반환됩니다.
+  // Specify if this read request should process data that ALREADY
+  // resides on a particular cache. If the required data is not
+  // found at the specified cache, then Status::Incomplete is returned.
   ReadTier read_tier = kReadAllTier;
 
-  // 이 옵션과 관련된 파일 읽기에 대해 지정된 우선순위로 내부 속도 제한기를
-  // 차지합니다. 특수 값 `Env::IO_TOTAL`은 속도 제한기 차지를 비활성화합니다.
+  // For file reads associated with this option, charge the internal rate
+  // limiter (see `DBOptions::rate_limiter`) at the specified priority. The
+  // special value `Env::IO_TOTAL` disables charging the rate limiter.
   //
-  // 속도 제한은 일반 테이블(이때 `ColumnFamilyOptions::table_factory`가
-  // `PlainTableFactory`인 경우) 및 큐쿠 테이블(이때
-  // `ColumnFamilyOptions::table_factory`가 `CuckooTableFactory`인 경우)의 파일
-  // 읽기에는 우회됩니다.
+  // The rate limiting is bypassed no matter this option's value for file reads
+  // on plain tables (these can exist when `ColumnFamilyOptions::table_factory`
+  // is a `PlainTableFactory`) and cuckoo tables (these can exist when
+  // `ColumnFamilyOptions::table_factory` is a `CuckooTableFactory`).
   //
-  // 속도 제한기로 차지된 바이트 수는 파일 읽기 바이트와 정확히 일치하지 않을 수
-  // 있습니다. 예를 들어, 파일 헤더/푸터와 같은 일부 미미한 읽기는 현재 속도
-  // 제한기로 차지하지 않습니다.
+  // The bytes charged to rate limiter may not exactly match the file read bytes
+  // since there are some seemingly insignificant reads, like for file
+  // headers/footers, that we currently do not charge to rate limiter.
   Env::IOPriority rate_limiter_priority = Env::IO_TOTAL;
 
   // It limits the maximum cumulative value size of the keys in batch while
@@ -1637,278 +1751,302 @@ struct ReadOptions {
   // soft limit then all the remaining keys are returned with status Aborted.
   uint64_t value_size_soft_limit = std::numeric_limits<uint64_t>::max();
 
-  // 병합 연산자가 적용된 수가 이 임계값을 초과하면
-  // 성공적인 쿼리 중에 연산은 kMergeOperandThresholdExceeded 하위 코드와 함께
-  // 특별한 OK 상태를 반환합니다. 현재는 포인트 조회에만 적용되며 기본적으로
-  // 비활성화되어 있습니다.
+  // When the number of merge operands applied exceeds this threshold
+  // during a successful query, the operation will return a special OK
+  // Status with subcode kMergeOperandThresholdExceeded. Currently only applies
+  // to point lookups and is disabled by default.
   std::optional<size_t> merge_operand_count_threshold;
 
-  // true로 설정되면, 기본 저장소에서 읽은 모든 데이터는
-  // 해당 체크섬과 비교하여 검증됩니다.
+  // If true, all data read from underlying storage will be
+  // verified against corresponding checksums.
   bool verify_checksums = true;
 
-  // 이 반복에서 읽은 "데이터 블록"/"인덱스 블록"이
-  // 블록 캐시에 저장되어야 하는지 여부를 지정합니다.
-  // 호출자는 대량 스캔에 대해 이 필드를 false로 설정할 수 있습니다.
-  // 이렇게 하면 기존 항목의 캐시 제거 순서가 변경되지 않도록 할 수 있습니다.
+  // Should the "data block"/"index block" read for this iteration be placed in
+  // block cache?
+  // Callers may wish to set this field to false for bulk scans.
+  // This would help not to the change eviction order of existing items in the
+  // block cache.
   bool fill_cache = true;
 
-  // true로 설정되면, 키 조회 경로에서 범위 tombstone 처리가 생략됩니다.
-  // DeleteRange() 호출을 사용하지 않는 DB 인스턴스의 경우, 이 설정은
-  // 읽기 성능을 최적화하는 데 사용될 수 있습니다.
-  // 이 가정(이전 DeleteRange() 호출 없음)이 깨지면, 오래된 키가 읽기 경로에서
-  // 제공될 수 있습니다.
+  // If true, range tombstones handling will be skipped in key lookup paths.
+  // For DB instances that don't use DeleteRange() calls, this setting can
+  // be used to optimize the read performance.
+  // Note that, if this assumption (of no previous DeleteRange() calls) is
+  // broken, stale keys could be served in read paths.
   bool ignore_range_deletions = false;
 
-  // async_io가 활성화된 경우, RocksDB는 일부 데이터를 비동기적으로 미리
-  // 가져옵니다. RocksDB는 읽기가 순차적일 때 자동으로 미리 가져오기를
-  // 적용합니다.
+  // If async_io is enabled, RocksDB will prefetch some of data asynchronously.
+  // RocksDB apply it if reads are sequential and its internal automatic
+  // prefetching.
   bool async_io = false;
 
-  // 실험적
+  // Experimental
   //
-  // async_io가 설정되면, 이 플래그는 우리가 SST 파일을 여러 레벨에서
-  // 비동기적으로 읽을지 여부를 제어합니다. 이 플래그를 활성화하면 MultiGet
-  // 배치의 키가 다른 레벨에 있을 경우, SST 파일을 병렬로 최대한 많이 읽어
-  // MultiGet 지연 시간을 줄이는 데 도움이 될 수 있습니다. 다만 약간 더 높은 CPU
-  // 오버헤드가 발생할 수 있습니다.
+  // If async_io is set, then this flag controls whether we read SST files
+  // in multiple levels asynchronously. Enabling this flag can help reduce
+  // MultiGet latency by maximizing the number of SST files read in
+  // parallel if the keys in the MultiGet batch are in different levels. It
+  // comes at the expense of slightly higher CPU overhead.
   bool optimize_multiget_for_io = true;
 
-  // *** 포인트 조회 및 스캔과 관련된 옵션 끝 ***
-  // *** 반복자나 스캔에만 관련된 옵션 시작 ***
+  // *** END options relevant to point lookups (as well as scans) ***
+  // *** BEGIN options only relevant to iterators or scans ***
 
-  // RocksDB는 테이블 파일에 대해 두 번 이상의 읽기가 발생하면 자동으로
-  // 리드어헤드를 시작합니다. 리드어헤드는 8KB에서 시작하여 각 추가 읽기마다 두
-  // 배씩 증가하여 최대 256KB까지 확장됩니다. 이 옵션은 대부분의 범위 스캔이
-  // 크고, 자동 리드어헤드에서 설정된 것보다 더 큰 리드어헤드가 필요한 경우에
-  // 도움이 될 수 있습니다. 일반적으로 리드어헤드 크기(> 2MB)를 사용하면
-  // 회전하는 디스크에서 전방 순차 반복 성능을 개선할 수 있습니다.
+  // RocksDB does auto-readahead for iterators on noticing more than two reads
+  // for a table file. The readahead starts at 8KB and doubles on every
+  // additional read up to 256KB.
+  // This option can help if most of the range scans are large, and if it is
+  // determined that a larger readahead than that enabled by auto-readahead is
+  // needed.
+  // Using a large readahead size (> 2MB) can typically improve the performance
+  // of forward iteration on spinning disks.
   size_t readahead_size = 0;
 
-  // 반복자 탐색이 불완전한 상태로 실패하기 전에 건너뛸 수 있는 키의 수에 대한
-  // 임계값입니다. 기본값 0은 키를 너무 많이 건너뛰어도 요청이 불완전한 상태로
-  // 실패하지 않도록 설정됩니다.
+  // A threshold for the number of keys that can be skipped before failing an
+  // iterator seek as incomplete. The default value of 0 should be used to
+  // never fail a request as incomplete, even on skipping too many keys.
   uint64_t max_skippable_internal_keys = 0;
 
-  // `iterate_lower_bound`는 역방향 반복자가 항목을 반환할 수 있는 가장 작은
-  // 키를 정의합니다. 경계값을 지나면 Valid()는 false가 됩니다.
-  // `iterate_lower_bound`는 포함됩니다(즉, 경계 값은 유효한 항목입니다).
+  // `iterate_lower_bound` defines the smallest key at which the backward
+  // iterator can return an entry. Once the bound is passed, Valid() will be
+  // false. `iterate_lower_bound` is inclusive ie the bound value is a valid
+  // entry.
   //
-  // prefix_extractor가 null이 아니면, Seek 대상과 `iterate_lower_bound`는 같은
-  // 접두사를 가져야 합니다. 이는 접두사 도메인 외부에서는 순서가 보장되지 않기
-  // 때문입니다.
+  // If prefix_extractor is not null, the Seek target and `iterate_lower_bound`
+  // need to have the same prefix. This is because ordering is not guaranteed
+  // outside of prefix domain.
   //
-  // 사용자 정의 타임스탬프가 활성화된 경우, `iterate_lower_bound`는 타임스탬프
-  // 부분이 없는 키를 가리켜야 합니다.
+  // In case of user_defined timestamp, if enabled, iterate_lower_bound should
+  // point to key without timestamp part.
   const Slice* iterate_lower_bound = nullptr;
 
-  // "iterate_upper_bound"는 순방향 반복자가 항목을 반환할 수 있는 범위를
-  // 정의합니다. 경계가 도달하면, Valid()는 false가 됩니다.
-  // "iterate_upper_bound"는 배타적(exclusive)입니다. 즉, 경계 값은 유효한
-  // 항목이 아닙니다. prefix_extractor가 null이 아니면:
-  // 1. options.auto_prefix_mode = true일 경우, iterate_upper_bound는
-  //    RocksDB에서 접두사 반복(예: 접두사 bloom 필터 적용)을 사용할 수 있는지
-  //    여부를 유추하는 데 사용됩니다. 이는 iterate_upper_bound와 seek 키를
-  //    비교하여 수행됩니다.
-  // 2. options.auto_prefix_mode = false일 경우, iterate_upper_bound는
-  //    seek 키와 동일한 접두사를 가질 때만 영향을 미칩니다. 만약
-  //    iterate_upper_bound가 seek 키의 접두사 범위를 벗어나면, 접두사 범위를
-  //    벗어난 키는 정의되지 않으며, 마치 iterate_upper_bound = null인 것처럼
-  //    동작합니다.
-  // iterate_upper_bound가 null이 아니면, SeekToLast()는 반복자를
-  // iterate_upper_bound보다 작은 첫 번째 키로 위치시킵니다.
+  // "iterate_upper_bound" defines the extent up to which the forward iterator
+  // can return entries. Once the bound is reached, Valid() will be false.
+  // "iterate_upper_bound" is exclusive ie the bound value is
+  // not a valid entry. If prefix_extractor is not null:
+  // 1. If options.auto_prefix_mode = true, iterate_upper_bound will be used
+  //    to infer whether prefix iterating (e.g. applying prefix bloom filter)
+  //    can be used within RocksDB. This is done by comparing
+  //    iterate_upper_bound with the seek key.
+  // 2. If options.auto_prefix_mode = false, iterate_upper_bound only takes
+  //    effect if it shares the same prefix as the seek key. If
+  //    iterate_upper_bound is outside the prefix of the seek key, then keys
+  //    returned outside the prefix range will be undefined, just as if
+  //    iterate_upper_bound = null.
+  // If iterate_upper_bound is not null, SeekToLast() will position the iterator
+  // at the first key smaller than iterate_upper_bound.
   //
-  // 사용자 정의 타임스탬프가 활성화된 경우, iterate_upper_bound는 타임스탬프
-  // 부분이 없는 키를 가리켜야 합니다.
+  // In case of user_defined timestamp, if enabled, iterate_upper_bound should
+  // point to key without timestamp part.
   const Slice* iterate_upper_bound = nullptr;
 
-  // 테일링 반복자를 생성하도록 지정합니다. 테일링 반복자는 데이터베이스 전체에
-  // 대한 뷰를 가지며 (즉, 새로 추가된 데이터도 읽을 수 있음) 순차적 읽기를
-  // 최적화한 특별한 반복자입니다. 이 반복자는 반복자가 생성된 이후에
-  // 데이터베이스에 삽입된 레코드를 반환합니다.
+  // Specify to create a tailing iterator -- a special iterator that has a
+  // view of the complete database (i.e. it can also be used to read newly
+  // added data) and is optimized for sequential reads. It will return records
+  // that were inserted into the database after the creation of the iterator.
   bool tailing = false;
 
-  // 이 옵션은 더 이상 사용되지 않습니다. 제거된 기능을 켜기 위한
-  // 옵션이었습니다. 더 이상 사용되지 않음.
+  // This options is not used anymore. It was to turn on a functionality that
+  // has been removed. DEPRECATED
   bool managed = false;
 
-  // 테이블에서 사용된 인덱스 형식(예: 해시 인덱스)에 관계없이 총 순서 검색을
-  // 활성화합니다. 일부 테이블 형식(예: 평범한 테이블)은 이 옵션을 지원하지 않을
-  // 수 있습니다. Get()을 호출할 때 true이면, 블록 기반 테이블에서 읽을 때
-  // 접두사 bloom을 건너뛰며, 이는 Get() 성능에만 영향을 미칩니다.
+  // Enable a total order seek regardless of index format (e.g. hash index)
+  // used in the table. Some table format (e.g. plain table) may not support
+  // this option.
+  // If true when calling Get(), we also skip prefix bloom when reading from
+  // block based table, which only affects Get() performance.
   bool total_order_seek = false;
 
-  // true일 경우 기본적으로 total_order_seek = true를 사용하고, RocksDB는
-  // 검색 키와 반복자 상한선에 따라 결과가 달라지지 않으면 접두사 검색 모드를
-  // 선택적으로 활성화할 수 있습니다. 버그:
-  // Comparator::IsSameLengthImmediateSuccessor와
-  // SliceTransform::FullLengthEnabled를 사용하여
-  // 반복자 상한선의 접두사가 검색 키의 접두사와 다를 경우 접두사 모드를
-  // 활성화하는 데 결함이 있습니다. DB에 존재하는 경우, "짧은 키"(전체 길이
-  // 접두사보다 짧은)는 auto_prefix_mode 반복에서 제외될 수 있으며, 이는
-  // total_order_seek 반복에서 나타날 수 있습니다. 이러한 짧은 키가 DB에
-  // 추가되지 않았거나 그러한 반복자에서 반환될 것으로 예상되지 않으면 이 문제는
-  // 발생하지 않습니다. (새로운 IsSameLengthImmediateSuccessor 조건이 만족된다고
-  // 가정합니다. 버그 예시는 DBTest2::AutoPrefixMode1에서 찾을 수 있습니다).
+  // When true, by default use total_order_seek = true, and RocksDB can
+  // selectively enable prefix seek mode if won't generate a different result
+  // from total_order_seek, based on seek key, and iterator upper bound.
+  // BUG: Using Comparator::IsSameLengthImmediateSuccessor and
+  // SliceTransform::FullLengthEnabled to enable prefix mode in cases where
+  // prefix of upper bound differs from prefix of seek key has a flaw.
+  // If present in the DB, "short keys" (shorter than "full length" prefix)
+  // can be omitted from auto_prefix_mode iteration when they would be present
+  // in total_order_seek iteration, regardless of whether the short keys are
+  // "in domain" of the prefix extractor. This is not an issue if no short
+  // keys are added to DB or are not expected to be returned by such
+  // iterators. (We are also assuming the new condition on
+  // IsSameLengthImmediateSuccessor is satisfied; see its BUG section).
+  // A bug example is in DBTest2::AutoPrefixMode1, search for "BUG".
   bool auto_prefix_mode = false;
 
-  // 반복자가 검색한 동일한 접두사만 반복하도록 강제합니다.
-  // 이는 반복자 범위가 열고 있는 컬럼 패밀리의 현재 prefix_extractor에
-  // 의존하도록 만듭니다. SST 파일이 동일한 접두사 추출기로 생성되면, 접두사
-  // 필터링 최적화가 Seek과 SeekForPrev 모두에 사용됩니다.
+  // Enforce that the iterator only iterates over the same prefix as the seek.
+  // This makes the iterator bounds dependent on the column family's current
+  // prefix_extractor, which is mutable. When SST files have been built with
+  // the same prefix extractor, prefix filtering optimizations will be used
+  // for both Seek and SeekForPrev.
   bool prefix_same_as_start = false;
 
-  // 반복자가 삭제되지 않는 한 반복자가 로드한 블록을 메모리에 고정시킵니다.
-  // BlockBasedTableOptions::use_delta_encoding = false로 생성된 테이블을 읽을
-  // 때 사용하면, 반복자의 속성 "rocksdb.iterator.is-key-pinned"가 1을 반환하는
-  // 것이 보장됩니다.
+  // Keep the blocks loaded by the iterator pinned in memory as long as the
+  // iterator is not deleted, If used when reading from tables created with
+  // BlockBasedTableOptions::use_delta_encoding = false,
+  // Iterator's property "rocksdb.iterator.is-key-pinned" is guaranteed to
+  // return 1.
   bool pin_data = false;
 
-  // 반복자에 대해, RocksDB는 테이블 파일에 대해 두 번 이상의 순차 읽기가
-  // 발생하면 자동으로 리드어헤드를 수행합니다. 사용자가 readahead_size를
-  // 제공하지 않으면 리드어헤드는 8KB에서 시작하여 추가적인 읽기마다 두 배씩
-  // 증가하여 최대 max_auto_readahead_size에 도달합니다. 단, 읽기가 순차적일
-  // 때만 적용됩니다. 그러나 각 레벨에서 반복자가 다음 파일로 이동하면,
-  // readahead_size는 다시 8KB에서 시작합니다.
+  // For iterators, RocksDB does auto-readahead on noticing more than two
+  // sequential reads for a table file if user doesn't provide readahead_size.
+  // The readahead starts at 8KB and doubles on every additional read upto
+  // max_auto_readahead_size only when reads are sequential. However at each
+  // level, if iterator moves over next file, readahead_size starts again from
+  // 8KB.
   //
-  // 이 옵션을 활성화하면, RocksDB는 데이터를 미리 가져오는 최적화 기능을
-  // 제공합니다.
+  // By enabling this option, RocksDB will do some enhancements for
+  // prefetching the data.
   bool adaptive_readahead = false;
 
-  // true로 설정되면, PurgeObsoleteFile이 CleanupIteratorState에서 호출될 때,
-  // 백그라운드 작업을 플러시 작업 큐에 예약하고 백그라운드에서 불필요한 파일을
-  // 삭제합니다.
+  // If true, when PurgeObsoleteFile is called in CleanupIteratorState, we
+  // schedule a background job in the flush job queue and delete obsolete files
+  // in background.
   bool background_purge_on_iterator_cleanup = false;
 
-  // 반복 시, 테이블의 속성을 기반으로 이 스캔에 해당하는 키가 주어진 테이블에
-  // 존재하는지 여부를 결정하는 콜백 함수입니다. 콜백은 각 테이블의 속성을
-  // 반복할 때마다 전달됩니다. 콜백이 false를 반환하면 해당 테이블은 스캔되지
-  // 않습니다. 이 옵션은 반복자에만 영향을 미치며 포인트 조회에는 영향을 미치지
-  // 않습니다. 기본값: 빈 값 (모든 테이블이 스캔됩니다)
+  // A callback to determine whether relevant keys for this scan exist in a
+  // given table based on the table's properties. The callback is passed the
+  // properties of each table during iteration. If the callback returns false,
+  // the table will not be scanned. This option only affects Iterators and has
+  // no impact on point lookups.
+  // Default: empty (every table will be scanned)
   std::function<bool(const TableProperties&)> table_filter;
 
-  // auto_readahead_size가 true로 설정되면, 블록 캐시가 활성화된 경우 블록 캐시
-  // 데이터를 기반으로 스캔 중에 내부적으로 readahead_size를 자동 조정합니다. 이
-  // 옵션은 `iterate_upper_bound != nullptr`와 `prefix_same_as_start == true`일
-  // 때만 효과를 봅니다.
+  // If auto_readahead_size is set to true, it will auto tune the readahead_size
+  // during scans internally based on block cache data when block cache is
+  // enabled, iteration upper bound when `iterate_upper_bound != nullptr` and
+  // prefix when `prefix_same_as_start == true`
   //
-  // 블록 캐시를 활성화하는 것 외에도 이 옵션이 적용되려면 `iterate_upper_bound
-  // != nullptr` 또는 `prefix_same_as_start == true`이어야 합니다.
+  // Besides enabling block cache, it
+  // also requires `iterate_upper_bound != nullptr` or  `prefix_same_as_start ==
+  // true` for this option to take effect
   //
-  // 구체적으로 다음과 같이 동작합니다:
-  // (1) `iterate_upper_bound`가 지정되면, 반복자의 상한을 초과하지 않도록
-  // readahead를 잘라냅니다. (2) `prefix_same_as_start`가 true로 설정되면,
-  // Seek()의 검색 키와 동일한 접두사에 포함되지 않은 키가 있는
-  //     데이터 블록은 미리 가져오지 않도록 readahead를 잘라냅니다.
-  //     - 제한 사항: 이 잘라내기 효과가 적용되려면 `Seek(key)`를 호출해야 하며
-  //     `SeekToFirst()`는 사용하지 않아야 합니다.
+  // To be specific, it does the following:
+  // (1) When `iterate_upper_bound`
+  // is specified, trim the readahead so the readahead does not exceed iteration
+  // upper bound
+  // (2) When `prefix_same_as_start` is set to true, trim the
+  // readahead so data blocks containing keys that are not in the same prefix as
+  // the seek key in `Seek()` are not prefetched
+  //  - Limition: `Seek(key)` instead of `SeekToFirst()` needs to be called in
+  //  order for this trimming to take effect
   //
-  // 참고: - 이 옵션은 순방향 스캔에만 사용됩니다.
-  //       - 역방향 스캔이 있을 경우, 이 옵션은 내부적으로 비활성화되며 순방향
-  //       스캔이 다시 발행되더라도 다시 활성화되지 않습니다.
+  // NOTE: - Used for forward Scans only.
+  //       - If there is a backward scans, this option will be
+  //          disabled internally and won't be enabled again if the forward scan
+  //          is issued again.
   //
-  // 기본값: true
+  // Default: true
   bool auto_readahead_size = true;
 
-  // 설정되면, 반복자가 다른 항목으로 이동할 때 값을 로드하거나 준비하는 작업을
-  // 지연시킬 수 있습니다. (예:
-  // SeekToFirst/SeekToLast/Seek/SeekForPrev/Next/Prev 작업 중). 이는 특정 키와
-  // 연관된 값이 애플리케이션에서 사용되지 않을 경우 I/O와 CPU 자원을 절약할 수
-  // 있습니다. IteratorBase::PrepareValue()도 참조하십시오.
+  // When set, the iterator may defer loading and/or preparing the value when
+  // moving to a different entry (i.e. during SeekToFirst/SeekToLast/Seek/
+  // SeekForPrev/Next/Prev operations). This can be used to save on I/O and/or
+  // CPU when the values associated with certain keys may not be used by the
+  // application. See also IteratorBase::PrepareValue().
   //
-  // 주의: 이 옵션은 현재 1) BlobDB를 사용하여 blob 파일에 저장된 큰 값과 2)
-  // 다중 컬럼 패밀리 반복자 (CoalescingIterator 및 AttributeGroupIterator)에만
-  // 적용됩니다. 그 외의 경우에는 아무 효과가 없습니다.
+  // Note: this option currently only applies to 1) large values stored in blob
+  // files using BlobDB and 2) multi-column-family iterators (CoalescingIterator
+  // and AttributeGroupIterator). Otherwise, it has no effect.
   //
-  // 기본값: false
+  // Default: false
   bool allow_unprepared_value = false;
 
-  // *** 반복자나 스캔과 관련된 옵션 끝 ***
+  // *** END options only relevant to iterators or scans ***
 
-  // *** RocksDB 내부 사용 전용 옵션 시작 ***
+  // *** BEGIN options for RocksDB internal use only ***
 
-  // 실험적
+  // EXPERIMENTAL
   Env::IOActivity io_activity = Env::IOActivity::kUnknown;
 
-  // *** RocksDB 내부 사용 전용 옵션 끝 ***
+  // *** END options for RocksDB internal use only ***
 
   ReadOptions() {}
   ReadOptions(bool _verify_checksums, bool _fill_cache);
   explicit ReadOptions(Env::IOActivity _io_activity);
 };
 
-// 쓰기 작업을 제어하는 옵션
+// Options that control write operations
 struct WriteOptions {
-  // true로 설정하면, 쓰기 작업이 완료되기 전에 운영 체제의 버퍼 캐시에서
-  // (WritableFile::Sync()를 호출하여) 플러시됩니다. 이 플래그가 true이면 쓰기가
-  // 더 느려집니다.
+  // If true, the write will be flushed from the operating system
+  // buffer cache (by calling WritableFile::Sync()) before the write
+  // is considered complete.  If this flag is true, writes will be
+  // slower.
   //
-  // 이 플래그가 false로 설정되면, 머신이 크래시할 경우 일부 최근 쓰기가 손실될
-  // 수 있습니다. 단, 프로세스만 크래시한 경우(즉, 머신이 재부팅되지 않은
-  // 경우)에는 sync가 false여도 쓰기가 손실되지 않습니다.
+  // If this flag is false, and the machine crashes, some recent
+  // writes may be lost.  Note that if it is just the process that
+  // crashes (i.e., the machine does not reboot), no writes will be
+  // lost even if sync==false.
   //
-  // 즉, sync가 false인 DB 쓰기는 "write()" 시스템 호출과 유사한 크래시 의미를
-  // 가집니다. sync가 true인 DB 쓰기는 "write()" 시스템 호출 뒤에
-  // "fdatasync()"를 호출한 것과 유사한 크래시 의미를 가집니다.
+  // In other words, a DB write with sync==false has similar
+  // crash semantics as the "write()" system call.  A DB write
+  // with sync==true has similar crash semantics to a "write()"
+  // system call followed by "fdatasync()".
   //
-  // 기본값: false
+  // Default: false
   bool sync = false;
 
-  // true로 설정하면, 쓰기 작업이 먼저 쓰기 앞서 로그(WAL)로 가지 않으며,
-  // 크래시 후 쓰기가 손실될 수 있습니다. 백업 엔진은 쓰기 앞서 로그를 사용하여
-  // memtable을 백업하므로, 쓰기 앞서 로그를 비활성화하면
-  // flush_before_backup=true로 백업을 생성해야 미플러시된 memtable 데이터가
-  // 손실되지 않습니다. 기본값: false
+  // If true, writes will not first go to the write ahead log,
+  // and the write may get lost after a crash. The backup engine
+  // relies on write-ahead logs to back up the memtable, so if
+  // you disable write-ahead logs, you must create backups with
+  // flush_before_backup=true to avoid losing unflushed memtable data.
+  // Default: false
   bool disableWAL = false;
 
-  // true로 설정하면, 사용자가 존재하지 않는 컬럼 패밀리에 쓰기를 시도할 때,
-  // 해당 쓰기를 무시하고(오류를 반환하지 않음) 다른 쓰기는 성공합니다.
-  // WriteBatch에 여러 쓰기가 포함되어 있으면 다른 쓰기도 성공합니다.
-  // 기본값: false
+  // If true and if user is trying to write to column families that don't exist
+  // (they were dropped),  ignore the write (don't return an error). If there
+  // are multiple writes in a WriteBatch, other writes will succeed.
+  // Default: false
   bool ignore_missing_column_families = false;
 
-  // true로 설정하면, 쓰기 요청에 대해 대기하거나 잠자기 상태로 전환해야 할 경우
-  // 즉시 Status::Incomplete()로 실패합니다.
-  // 기본값: false
+  // If true and we need to wait or sleep for the write request, fails
+  // immediately with Status::Incomplete().
+  // Default: false
   bool no_slowdown = false;
 
-  // true로 설정하면, compaction이 뒤처져 있는 경우 이 쓰기 요청의 우선순위가
-  // 낮아집니다. 이 경우, no_slowdown = true일 때 요청은 즉시 취소되고
-  // Status::Incomplete()가 반환됩니다. 그렇지 않으면, 쓰기는 속도가 느려집니다.
-  // 느려짐의 정도는 RocksDB가 결정하여 높은 우선순위 쓰기에 최소한의 영향을
-  // 주도록 보장합니다.
+  // If true, this write request is of lower priority if compaction is
+  // behind. In this case, no_slowdown = true, the request will be canceled
+  // immediately with Status::Incomplete() returned. Otherwise, it will be
+  // slowed down. The slowdown value is determined by RocksDB to guarantee
+  // it introduces minimum impacts to high priority writes.
   //
-  // 기본값: false
+  // Default: false
   bool low_pri = false;
 
-  // true로 설정하면, 이 WriteBatch는 각 memtable의 마지막 삽입 위치를 힌트로
-  // 저장합니다. 이 옵션은 동시에 여러 쓰기가 있을 때 성능을 향상시킬 수
-  // 있습니다. 비동기적(memtable_writes가 false일 경우) 쓰기에는 무시됩니다.
+  // If true, this writebatch will maintain the last insert positions of each
+  // memtable as hints in concurrent write. It can improve write performance
+  // in concurrent writes if keys in one writebatch are sequential. In
+  // non-concurrent writes (when concurrent_memtable_writes is false) this
+  // option will be ignored.
   //
-  // 기본값: false
+  // Default: false
   bool memtable_insert_hint_per_batch = false;
 
-  // 이 옵션과 관련된 쓰기 작업에 대해, 내부 rate limiter(참조:
-  // `DBOptions::rate_limiter`)가 지정된 우선순위로 과금됩니다. 특별한 값
-  // `Env::IO_TOTAL`은 rate limiter 과금을 비활성화합니다.
+  // For writes associated with this option, charge the internal rate
+  // limiter (see `DBOptions::rate_limiter`) at the specified priority. The
+  // special value `Env::IO_TOTAL` disables charging the rate limiter.
   //
-  // 현재 이 지원은 자동 WAL 플러시를 포함하며, 이는 `WriteOptions::disableWAL
-  // == false`이고 `DBOptions::manual_wal_flush == false`일 때 발생합니다.
+  // Currently the support covers automatic WAL flushes, which happen during
+  // live updates (`Put()`, `Write()`, `Delete()`, etc.)
+  // when `WriteOptions::disableWAL == false`
+  // and `DBOptions::manual_wal_flush == false`.
   //
-  // 현재는 `Env::IO_USER`와 `Env::IO_TOTAL`만 허용됩니다.
+  // Only `Env::IO_USER` and `Env::IO_TOTAL` are allowed
+  // due to implementation constraints.
   //
-  // 기본값: `Env::IO_TOTAL`
+  // Default: `Env::IO_TOTAL`
   Env::IOPriority rate_limiter_priority = Env::IO_TOTAL;
 
-  // `protection_bytes_per_key`는 각 키 항목에 대해 보호 정보를 저장하는 데
-  // 사용되는 바이트 수입니다. 현재 지원되는 값은 0 (비활성화)과 8입니다.
+  // `protection_bytes_per_key` is the number of bytes used to store
+  // protection information for each key entry. Currently supported values are
+  // zero (disabled) and eight.
   //
-  // 기본값: 0 (비활성화).
+  // Default: zero (disabled).
   size_t protection_bytes_per_key = 0;
 
-  // RocksDB 내부 사용 전용
+  // For RocksDB internal use only
   //
-  // 기본값: Env::IOActivity::kUnknown.
+  // Default: Env::IOActivity::kUnknown.
   Env::IOActivity io_activity = Env::IOActivity::kUnknown;
 
   WriteOptions() {}
@@ -1918,48 +2056,47 @@ struct WriteOptions {
       Env::IOActivity _io_activity = Env::IOActivity::kUnknown);
 };
 
-// 플러시 작업을 제어하는 옵션
+// Options that control flush operations
 struct FlushOptions {
-  // true로 설정하면, 플러시가 완료될 때까지 대기합니다.
-  // 기본값: true
+  // If true, the flush will wait until the flush is done.
+  // Default: true
   bool wait;
-
-  // true로 설정하면, 플러시가 즉시 진행되며, 이로 인해 플러시 동안 쓰기가 일시
-  // 중지될 수 있습니다. false로 설정하면, 플러시는 쓰기가 일시 중지되지 않거나
-  // 다른(백그라운드 또는 포그라운드 호출) 플러시 작업이 완료될 때까지
-  // 대기합니다. 기본값: false
+  // If true, the flush would proceed immediately even it means writes will
+  // stall for the duration of the flush; if false the operation will wait
+  // until it's possible to do flush w/o causing stall or until required flush
+  // is performed by someone else (foreground call or background thread).
+  // Default: false
   bool allow_write_stall;
 
   FlushOptions() : wait(true), allow_write_stall(false) {}
 };
 
-// 제공된 DBOptions를 사용하여 Logger를 생성합니다.
+// Create a Logger from provided DBOptions
 Status CreateLoggerFromOptions(const std::string& dbname,
                                const DBOptions& options,
                                std::shared_ptr<Logger>* logger);
 
-// CompactionOptions는 CompactFiles() 호출에서 사용됩니다.
+// CompactionOptions are used in CompactFiles() call.
 struct CompactionOptions {
-  // DEPRECATED: 이 옵션은 사용자가 `CompressionType`을 임의로 설정할 수 있기
-  // 때문에 안전하지 않습니다. 항상 `ColumnFamilyOptions`에서 제공된
-  // `CompressionOptions`를 사용합니다. 이로 인해 `CompressionType`과
-  // `CompressionOptions`가 일관되지 않게 될 수 있습니다.
+  // DEPRECATED: this option is unsafe because it allows the user to set any
+  // `CompressionType` while always using `CompressionOptions` from the
+  // `ColumnFamilyOptions`. As a result the `CompressionType` and
+  // `CompressionOptions` can easily be inconsistent.
   //
-  // Compaction 출력의 압축 유형
+  // Compaction output compression type
   //
-  // 기본값: `kDisableCompressionOption`
+  // Default: `kDisableCompressionOption`
   //
-  // `kDisableCompressionOption`으로 설정하면, RocksDB는 `ColumnFamilyOptions`에
-  // 따라 압축 유형을 선택합니다. RocksDB는 `ColumnFamilyOptions`에 레벨별
-  // 설정이 있을 경우 출력 레벨도 고려합니다.
+  // If set to `kDisableCompressionOption`, RocksDB will choose compression type
+  // according to the `ColumnFamilyOptions`. RocksDB takes into account the
+  // output level in case the `ColumnFamilyOptions` has level-specific settings.
   CompressionType compression;
 
-  // Compaction은 `output_file_size_limit` 크기의 파일을 생성합니다.
-  // 기본값: MAX, 즉 compaction은 하나의 파일만 생성합니다.
+  // Compaction will create files of size `output_file_size_limit`.
+  // Default: MAX, which means that compaction will create a single file
   uint64_t output_file_size_limit;
 
-  // 0보다 크면, 이 값은 해당 compaction에 대해 DBOptions에서 이 옵션을
-  // 대체합니다.
+  // If > 0, it will replace the option in the DBOptions for this compaction.
   uint32_t max_subcompactions;
 
   CompactionOptions()
@@ -1968,247 +2105,255 @@ struct CompactionOptions {
         max_subcompactions(0) {}
 };
 
-// 레벨 기반 컴팩션에서는 하위 레벨 컴팩션을 건너뛰거나 강제로 실행할지 여부를
-// 설정할 수 있습니다.
+// For level based compaction, we can configure if we want to skip/force
+// bottommost level compaction.
 enum class BottommostLevelCompaction {
-  // 하위 레벨 컴팩션을 건너뜁니다.
+  // Skip bottommost level compaction.
   kSkip,
-  // 컴팩션 필터가 있을 경우에만 하위 레벨을 컴팩션합니다.
-  // 이는 기본 옵션입니다.
-  // kForceOptimized와 유사하게, 하위 레벨을 컴팩션할 때 동일한 수동 컴팩션에서
-  // 생성된 파일을 중복 컴팩션하지 않도록 합니다.
+  // Only compact bottommost level if there is a compaction filter.
+  // This is the default option.
+  // Similar to kForceOptimized, when compacting bottommost level, avoid
+  // double-compacting files
+  // created in the same manual compaction.
   kIfHaveCompactionFilter,
-  // 항상 하위 레벨을 컴팩션합니다.
+  // Always compact bottommost level.
   kForce,
-  // 항상 하위 레벨을 컴팩션하되, 하위 레벨에서 동일한 컴팩션에서 생성된 파일의
-  // 중복 컴팩션을 피합니다.
+  // Always compact bottommost level but in bottommost level avoid
+  // double-compacting files created in the same compaction.
   kForceOptimized,
 };
 
-// 수동 컴팩션에서, blob 파일의 가비지 컬렉션을 건너뛰거나 강제로 실행할지
-// 여부를 설정할 수 있습니다.
+// For manual compaction, we can configure if we want to skip/force garbage
+// collection of blob files.
 enum class BlobGarbageCollectionPolicy {
-  // blob 파일의 가비지 컬렉션을 강제로 실행합니다.
+  // Force blob file garbage collection.
   kForce,
-  // blob 파일의 가비지 컬렉션을 건너뜁니다.
+  // Skip blob file garbage collection.
   kDisable,
-  // ColumnFamilyOptions에서 blob 파일 가비지 컬렉션 정책을 상속합니다.
+  // Inherit blob file garbage collection policy from ColumnFamilyOptions.
   kUseDefault,
 };
 
-// CompactRangeOptions는 CompactRange() 호출에서 사용됩니다.
+// CompactRangeOptions is used by CompactRange() call.
 struct CompactRangeOptions {
-  // true로 설정하면, 이 수동 컴팩션과 동시에 다른 컴팩션이 실행되지 않습니다.
-  // 기본값: false
+  // If true, no other compaction will run at the same time as this
+  // manual compaction.
+  //
+  // Default: false
   bool exclusive_manual_compaction = false;
 
-  // true로 설정하면, 컴팩션된 파일은 데이터를 담을 수 있는 최소 레벨로
-  // 이동하거나 주어진 레벨(target_level)로 이동합니다.
+  // If true, compacted files will be moved to the minimum level capable
+  // of holding the data or given level (specified non-negative target_level).
   bool change_level = false;
-  // change_level이 true이고 target_level이 비음수 값이면, 컴팩션된 파일은
-  // target_level로 이동합니다.
+  // If change_level is true and target_level have non-negative value, compacted
+  // files will be moved to target_level.
   int target_level = -1;
-  // 컴팩션 출력은 options.db_paths[target_path_id]에 배치됩니다.
-  // target_path_id가 범위를 벗어나면 동작이 정의되지 않습니다.
+  // Compaction outputs will be placed in options.db_paths[target_path_id].
+  // Behavior is undefined if target_path_id is out of range.
   uint32_t target_path_id = 0;
-  // 기본적으로 레벨 기반 컴팩션은 컴팩션 필터가 있을 경우에만 하위 레벨
-  // 컴팩션을 진행합니다.
+  // By default level based compaction will only compact the bottommost level
+  // if there is a compaction filter
   BottommostLevelCompaction bottommost_level_compaction =
       BottommostLevelCompaction::kIfHaveCompactionFilter;
-  // true로 설정하면, DB가 쓰기 일시 중지 모드에 들어가더라도 즉시 실행됩니다.
-  // 그렇지 않으면, 부하가 낮아질 때까지 대기합니다.
+  // If true, will execute immediately even if doing so would cause the DB to
+  // enter write stall mode. Otherwise, it'll sleep until load is low enough.
   bool allow_write_stall = false;
-  // 0보다 크면, 이 값은 해당 compaction에 대해 DBOptions에서 이 옵션을
-  // 대체합니다.
+  // If > 0, it will replace the option in the DBOptions for this compaction.
   uint32_t max_subcompactions = 0;
-  // 사용자 정의 타임스탬프 하한선을 설정합니다. 이 하한선보다 오래된 데이터는
-  // 컴팩션에 의해 가비지 컬렉션될 수 있습니다. 기본값: nullptr
+  // Set user-defined timestamp low bound, the data with older timestamp than
+  // low bound maybe GCed by compaction. Default: nullptr
   const Slice* full_history_ts_low = nullptr;
 
-  // 진행 중인 수동 컴팩션을 취소할 수 있습니다.
+  // Allows cancellation of an in-progress manual compaction.
   //
-  // `exclusive_manual_compaction == true`와 함께 사용할 경우, 자동 컴팩션이
-  // 진행 중이라도 취소가 지연될 수 있습니다.
+  // Cancellation can be delayed waiting on automatic compactions when used
+  // together with `exclusive_manual_compaction == true`.
   std::atomic<bool>* canceled = nullptr;
-  // 참고: DisableManualCompaction()을 호출하면 CompactRangeOptions에서 제공된
-  // canceled 변수를 덮어씁니다. 일반적으로, CompactRange가 하나의
-  // 스레드(t1)에서 canceled = false로 호출되고, DisableManualCompaction이 다른
-  // 스레드(t2)에서 호출되면, 수동 컴팩션은 정상적으로 비활성화됩니다. 컴팩션
-  // 이터레이터가 몇 개의 항목을 스캔할 수 있지만 *canceled가 true로 설정되기
-  // 전까지는 완료되지 않습니다.
+  // NOTE: Calling DisableManualCompaction() overwrites the uer-provided
+  // canceled variable in CompactRangeOptions.
+  // Typically, when CompactRange is being called in one thread (t1) with
+  // canceled = false, and DisableManualCompaction is being called in the
+  // other thread (t2), manual compaction is disabled normally, even if the
+  // compaction iterator may still scan a few items before *canceled is
+  // set to true
 
-  // kForce로 설정되면, RocksDB는 enable_blob_file_garbage_collection을 true로
-  // 강제 설정합니다. kDisable로 설정되면, 이를 false로 강제 설정하고,
-  // kUseDefault는 설정을 그대로 유지합니다. 이 옵션을 사용하면 CompactRange
-  // 호출 시 GC를 강제 활성화하거나 비활성화할 수 있습니다.
+  // If set to kForce, RocksDB will override enable_blob_file_garbage_collection
+  // to true; if set to kDisable, RocksDB will override it to false, and
+  // kUseDefault leaves the setting in effect. This enables customers to both
+  // force-enable and force-disable GC when calling CompactRange.
   BlobGarbageCollectionPolicy blob_garbage_collection_policy =
       BlobGarbageCollectionPolicy::kUseDefault;
 
-  // 0보다 크면, 사용자 제공 설정을 덮어쓰고, ColumnFamilyOptions의
-  // blob_garbage_collection_age_cutoff 설정을 그대로 사용합니다. 이 옵션을
-  // 사용하면 고객이 선택적으로 나이 컷오프를 덮어쓸 수 있습니다.
+  // If set to < 0 or > 1, RocksDB leaves blob_garbage_collection_age_cutoff
+  // from ColumnFamilyOptions in effect. Otherwise, it will override the
+  // user-provided setting. This enables customers to selectively override the
+  // age cutoff.
   double blob_garbage_collection_age_cutoff = -1;
 };
 
-// IngestExternalFileOptions는 IngestExternalFile()에서 사용됩니다.
+// IngestExternalFileOptions is used by IngestExternalFile()
 struct IngestExternalFileOptions {
-  // true로 설정하면 파일을 복사하는 대신 이동합니다.
-  // 입력 파일은 성공적으로 삽입된 후에 연결이 끊어집니다.
-  // 구현은 전통적인 이동(RenameFile) 대신 하드 링크(LinkFile)를 사용하여
-  // 실패 시 원래 상태로 복원될 가능성을 극대화합니다.
+  // Can be set to true to move the files instead of copying them.
+  // The input files will be unlinked after successful ingestion.
+  // The implementation depends on hard links (LinkFile) instead of traditional
+  // move (RenameFile) to maximize the chances to restore to the original
+  // state upon failure.
   bool move_files = false;
-
-  // move_files와 동일하지만 입력 파일은 연결이 끊어지지 않습니다.
-  // `move_files`와 `link_files`는 동시에 설정할 수 없습니다.
+  // Same as move_files except that input files will NOT be unlinked.
+  // Only one of `move_files` and `link_files` can be set at the same time.
   bool link_files = false;
-
-  // 하드 링크가 실패하면 복사로 대체하도록 설정하면 true입니다.
-  // 이는 `move_files`와 `link_files` 모두에 적용됩니다.
+  // If set to true, ingestion falls back to copy when hard linking fails.
+  // This applies to both `move_files` and `link_files`.
   bool failed_move_fall_back_to_copy = true;
-
-  // true로 설정하면, 파일을 삽입한 후 기존 스냅샷에 삽입된 파일 키가 나타날 수
-  // 없습니다. 파일이 삽입되기 전에 생성된 스냅샷에 나타날 수 없습니다.
+  // If set to false, an ingested file keys could appear in existing snapshots
+  // that where created before the file was ingested.
   bool snapshot_consistency = true;
-
-  // false로 설정하면, 파일 키 범위가 기존 키 또는 tombstone과 겹치거나
-  // 진행 중인 컴팩션의 출력과 겹치는 경우 IngestExternalFile()가 실패합니다.
-  // (이 조건에서 전역 seqno를 삽입된 파일에 할당해야 합니다).
+  // If set to false, IngestExternalFile() will fail if the file key range
+  // overlaps with existing keys or tombstones or output of ongoing compaction
+  // during file ingestion in the DB (the conditions under which a global_seqno
+  // must be assigned to the ingested file).
   bool allow_global_seqno = true;
-
-  // false로 설정하고 파일 키 범위가 memtable 키 범위와 겹치면
-  // (memtable 플러시 필요), IngestExternalFile은 실패합니다.
+  // If set to false and the file key range overlaps with the memtable key range
+  // (memtable flush required), IngestExternalFile will fail.
   bool allow_blocking_flush = true;
-
-  // 삽입된 파일에 중복된 키가 있으면 해당 키를 덮어쓰는 대신 건너뛰도록
-  // 설정하면 true입니다. 사용 사례: 기존 데이터는 덮어쓰지 않고 데이터베이스에
-  // 일부 이력 데이터를 백필할 때 사용됩니다. 이 옵션은 DB가
-  // allow_ingest_behind=true로 실행된 상태에서만 사용할 수 있습니다. 모든
-  // 파일은 seqno=0으로 하위 레벨에 삽입됩니다.
+  // Set to true if you would like duplicate keys in the file being ingested
+  // to be skipped rather than overwriting existing data under that key.
+  // Use case: back-fill of some historical data in the database without
+  // over-writing existing newer version of data.
+  // This option could only be used if the DB has been running
+  // with allow_ingest_behind=true since the dawn of time.
+  // All files will be ingested at the bottommost level with seqno=0.
   bool ingest_behind = false;
-
-  // DEPRECATED - 삽입 시 외부 SST 파일에 global_seqno를 작성하려면 true로
-  // 설정합니다. 이는 RocksDB 5.16.0 이전의 호환성을 위해서 사용됩니다. 구버전
-  // RocksDB는 global_seqno가 DB 매니페스트에 기록되는 대신 SST 파일에
-  // 작성되기를 기대합니다. 이 기능은 (a) 랜덤 쓰기가 일부 파일 시스템에서 비쌀
-  // 수 있거나 지원되지 않을 수 있고, (b) 이러한 쓰기로 인해 파일 체크섬이
-  // 변경되므로 deprecated 되었습니다.
+  // DEPRECATED - Set to true if you would like to write global_seqno to
+  // the external SST file on ingestion for backward compatibility before
+  // RocksDB 5.16.0. Such old versions of RocksDB expect any global_seqno to
+  // be written to the SST file rather than recorded in the DB manifest.
+  // This functionality was deprecated because (a) random writes might be
+  // costly or unsupported on some FileSystems, and (b) the file checksum
+  // changes with such a write.
   bool write_global_seqno = false;
-
-  // 외부 SST 파일을 삽입하기 전에 각 블록의 체크섬을 확인하려면 true로
-  // 설정합니다. 경고: 이것을 true로 설정하면 외부 SST 파일을 읽어야 하기 때문에
-  // 파일 삽입 속도가 느려집니다.
+  // Set to true if you would like to verify the checksums of each block of the
+  // external SST file before ingestion.
+  // Warning: setting this to true causes slowdown in file ingestion because
+  // the external SST file has to be read.
   bool verify_checksums_before_ingest = false;
-
-  // verify_checksums_before_ingest = true일 때 RocksDB는 기본 readahead 설정을
-  // 사용하여 파일을 스캔하면서 체크섬을 확인합니다. 사용자는 이 옵션을 사용하여
-  // 기본값을 재정의할 수 있습니다. 큰 readahead 크기(> 2MB)는 회전하는
-  // 디스크에서 순차적 반복 성능을 향상시킬 수 있습니다.
+  // When verify_checksums_before_ingest = true, RocksDB uses default
+  // readahead setting to scan the file while verifying checksums before
+  // ingestion.
+  // Users can override the default value using this option.
+  // Using a large readahead size (> 2MB) can typically improve the performance
+  // of forward iteration on spinning disks.
   size_t verify_checksums_readahead_size = 0;
-  // 사용자 설정에 따라, 삽입된 파일의 SST 파일 체크섬을 검증하려면 TRUE로
-  // 설정합니다. DB의 체크섬 함수는 삽입된 각 파일의 체크섬을 생성하고, 체크섬
-  // 함수 이름과 체크섬을 삽입된 체크섬 정보와 비교합니다.
+  // Set to TRUE if user wants to verify the sst file checksum of ingested
+  // files. The DB checksum function will generate the checksum of each
+  // ingested file (if file_checksum_gen_factory is set) and compare the
+  // checksum function name and checksum with the ingested checksum information.
   //
-  // 이 옵션이 True로 설정되면: 1) DB가 체크섬을 활성화하지 않으면
-  // (file_checksum_gen_factory == nullptr) 삽입된 체크섬 정보는 무시됩니다;
-  // 2) DB가 체크섬 함수를 활성화하면, 파일이 이동하거나 복사된 후 SST 파일
-  // 체크섬을 계산하고 체크섬과 체크섬 함수 이름을 비교합니다. 체크섬이나 체크섬
-  // 함수 이름이 일치하지 않으면 삽입이 실패합니다. 검증이 성공하면 체크섬과
-  // 체크섬 함수 이름이 매니페스트에 저장됩니다. 이 옵션이 FALSE로 설정되면: 1)
-  // DB가 체크섬을 활성화하지 않으면 삽입된 체크섬 정보는 무시됩니다; 2) DB가
-  // 체크섬을 활성화하면, 우리는 삽입된 체크섬 함수 이름만 검증하고 삽입된
-  // 체크섬을 신뢰합니다. 체크섬 함수 이름이 일치하면, 매니페스트에 체크섬을
-  // 저장합니다. 그러나 삽입된 파일에 체크섬 정보가 제공되지 않으면 DB는
-  // 체크섬을 생성하여 매니페스트에 저장합니다.
+  // If this option is set to True: 1) if DB does not enable checksum
+  // (file_checksum_gen_factory == nullptr), the ingested checksum information
+  // will be ignored; 2) If DB enable the checksum function, we calculate the
+  // sst file checksum after the file is moved or copied and compare the
+  // checksum and checksum name. If checksum or checksum function name does
+  // not match, ingestion will be failed. If the verification is successful,
+  // checksum and checksum function name will be stored in Manifest.
+  // If this option is set to FALSE, 1) if DB does not enable checksum,
+  // the ingested checksum information will be ignored; 2) if DB enable the
+  // checksum, we only verify the ingested checksum function name and we
+  // trust the ingested checksum. If the checksum function name matches, we
+  // store the checksum in Manifest. DB does not calculate the checksum during
+  // ingestion. However, if no checksum information is provided with the
+  // ingested files, DB will generate the checksum and store in the Manifest.
   bool verify_file_checksum = true;
-
-  // 사용자가 파일을 마지막 레벨에 삽입하고 싶으면 TRUE로 설정합니다.
-  // DB::IngestExternalFile()/DB::IngestExternalFiles()를 호출할 때 파일이
-  // 마지막 레벨에 맞지 않으면 Status::TryAgain() 오류가 반환됩니다. 사용자는
-  // 재시도 전에 겹치는 범위에서 마지막 레벨을 지워야 합니다.
+  // Set to TRUE if user wants file to be ingested to the last level. An
+  // error of Status::TryAgain() will be returned if a file cannot fit in the
+  // last level when calling
+  // DB::IngestExternalFile()/DB::IngestExternalFiles(). The user should clear
+  // the last level in the overlapping range before re-attempt.
   //
-  // ingest_behind는 fail_if_not_bottommost_level보다 우선합니다.
+  // ingest_behind takes precedence over fail_if_not_bottommost_level.
   //
-  // XXX: "bottommost"는 마지막 레벨을 지칭하는 혼란스러운/구식 용어입니다.
+  // XXX: "bottommost" is obsolete/confusing terminology to refer to last level
   bool fail_if_not_bottommost_level = false;
-
   // EXPERIMENTAL
-  // SstFileWriter로 생성되지 않은 파일의 삽입을 활성화합니다. true로 설정하면:
-  // - 삽입하려는 CF와 CF ID가 일치하지 않는 파일의 삽입을 허용합니다.
-  // 요구 사항:
-  // - 삽입된 파일이 기존 키와 겹치지 않아야 합니다.
-  // - `write_global_seqno`는 false여야 합니다.
-  // - 삽입된 파일의 모든 키는 시퀀스 번호가 0이어야 합니다. 하나라도 시퀀스
-  // 번호가 0이 아니면 삽입이 실패합니다. 경고: DB가 다른 DB/CF에서 생성된
-  // 삽입된 파일을 포함하고 있으면, RepairDB()는 이 파일을 올바르게 복구하지
-  // 못할 수 있어 데이터 손실이 발생할 수 있습니다.
+  // Enables ingestion of files not generated by SstFileWriter. When true:
+  // - Allows files to be ingested when their cf_id doesn't match the CF they
+  //   are being ingested into.
+  // REQUIREMENTS:
+  // - Ingested files must not overlap with existing keys.
+  // - `write_global_seqno` must be false.
+  // - All keys in ingested files should have sequence number 0. We fail
+  // ingestion if any sequence numbers is non-zero.
+  // WARNING: If a DB contains ingested files generated by another DB/CF,
+  // RepairDB() may not recover these files correctly, potentially leading to
+  // data loss.
   bool allow_db_generated_files = false;
 
-  // 파일 삽입 중에 데이터와 메타데이터 블록(예: 인덱스, 필터)을 읽을 때
-  // 블록 캐시에 추가될지 여부를 제어합니다.
-  // 읽을 수 없는 CF로 대량 로딩할 때 이 옵션을 false로 설정할 수 있습니다.
-  // 여러 CF로 삽입할 때 이 옵션은 삽입 옵션 간에 동일해야 합니다.
+  // Controls whether data and metadata blocks (e.g. index, filter) read during
+  // file ingestion will be added to block cache.
+  // Users may wish to set this to false when bulk loading into a CF that is not
+  // available for reads yet.
+  // When ingesting to multiple families, this option should be the same across
+  // ingestion options.
   bool fill_cache = true;
 };
 
 enum TraceFilterType : uint64_t {
-  // 모든 작업을 추적합니다.
+  // Trace all the operations
   kTraceFilterNone = 0x0,
-  // get 작업을 추적하지 않습니다.
+  // Do not trace the get operations
   kTraceFilterGet = 0x1 << 0,
-  // write 작업을 추적하지 않습니다.
+  // Do not trace the write operations
   kTraceFilterWrite = 0x1 << 1,
-  // `Iterator::Seek()` 작업을 추적하지 않습니다.
+  // Do not trace the `Iterator::Seek()` operations
   kTraceFilterIteratorSeek = 0x1 << 2,
-  // `Iterator::SeekForPrev()` 작업을 추적하지 않습니다.
+  // Do not trace the `Iterator::SeekForPrev()` operations
   kTraceFilterIteratorSeekForPrev = 0x1 << 3,
-  // `MultiGet()` 작업을 추적하지 않습니다.
+  // Do not trace the `MultiGet()` operations
   kTraceFilterMultiGet = 0x1 << 4,
 };
 
-// TraceOptions는 StartTrace에 사용되는 옵션 구조체입니다.
+// TraceOptions is used for StartTrace
 struct TraceOptions {
-  // 트레이스 파일 크기가 저장소 공간보다 커지는 것을 방지하기 위해,
-  // 사용자는 최대 트레이스 파일 크기를 바이트 단위로 설정할 수 있습니다.
-  // 기본값은 64GB입니다.
+  // To avoid the trace file size grows large than the storage space,
+  // user can set the max trace file size in Bytes. Default is 64GB
   uint64_t max_trace_file_size = uint64_t{64} * 1024 * 1024 * 1024;
-
-  // 트레이스 샘플링 옵션을 설정합니다. 즉, 몇 개의 요청당 하나씩 캡처할지
-  // 지정합니다. 기본값은 1 (모든 요청을 캡처)입니다.
+  // Specify trace sampling option, i.e. capture one per how many requests.
+  // Default to 1 (capture every request).
   uint64_t sampling_frequency = 1;
-
-  // 필터링은 샘플링 전에 발생합니다.
+  // Note: The filtering happens before sampling.
   uint64_t filter = kTraceFilterNone;
-
-  // true로 설정하면, 트레이스 내의 쓰기 기록 순서가 WAL에 있는 순서와
-  // 일치하도록 보장됩니다. 이 순서를 보존하는 데 성능 저하가 있을 수 있습니다.
+  // When true, the order of write records in the trace will match the order of
+  // the corresponding write records in the WAL and applied to the DB. There may
+  // be a performance penalty associated with preserving this ordering.
   //
-  // 기본값: false. 이 경우 트레이스 내 쓰기 기록 순서는 WAL의 순서와 다를 수
-  // 있습니다.
+  // Default: false. This means write records in the trace may be in an order
+  // different from the WAL's order.
   bool preserve_write_order = false;
 };
 
-// ImportColumnFamilyOptions는 ImportColumnFamily()에 사용됩니다.
+// ImportColumnFamilyOptions is used by ImportColumnFamily()
 struct ImportColumnFamilyOptions {
-  // 파일을 복사하는 대신 이동하려면 true로 설정합니다.
+  // Can be set to true to move the files instead of copying them.
   bool move_files = false;
 };
 
-// DB::GetApproximateSizes()와 함께 사용되는 옵션입니다.
+// Options used with DB::GetApproximateSizes()
 struct SizeApproximationOptions {
-  // 반환된 크기에 최근에 기록된 메모리 테이블 데이터를 포함할지 여부를
-  // 정의합니다. false로 설정되면, include_files는 true여야 합니다.
+  // Defines whether the returned size should include the recently written
+  // data in the memtables. If set to false, include_files must be true.
   bool include_memtables = false;
-
-  // 반환된 크기에 디스크에 직렬화된 데이터를 포함할지 여부를 정의합니다.
-  // false로 설정되면, include_memtables는 true여야 합니다.
+  // Defines whether the returned size should include data serialized to disk.
+  // If set to false, include_memtables must be true.
   bool include_files = true;
-
-  // DB::GetApproximateSizes를 사용하여 키 범위를 저장하는 데 사용되는 파일의 총
-  // 크기를 근사할 때, 파일 크기 오류 한도 내에서 근사할 수 있도록 허용합니다.
-  // 이는 파일 크기 근사에서 일부 단축을 허용하여 더 나은 성능을 보장하면서
-  // 결과 오류가 합리적인 범위 내에 있도록 합니다.
-  // 예를 들어, 값이 0.1이면 반환된 파일 크기 근사의 오류 한도는 10% 이내입니다.
-  // 값이 0보다 작거나 같으면 더 정확하지만 CPU 집약적인 추정이 수행됩니다.
+  // When approximating the files total size that is used to store a keys range
+  // using DB::GetApproximateSizes, allow approximation with an error margin of
+  // up to total_files_size * files_size_error_margin. This allows to take some
+  // shortcuts in files size approximation, resulting in better performance,
+  // while guaranteeing the resulting error is within a reasonable margin.
+  // E.g., if the value is 0.1, then the error margin of the returned files size
+  // approximation will be within 10%.
+  // If the value is non-positive - a more precise yet more CPU intensive
+  // estimation is performed.
   double files_size_error_margin = -1.0;
 };
 
