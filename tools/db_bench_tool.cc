@@ -1,3 +1,63 @@
+/**
+ * RocksDB db_bench 옵션 목록
+ *
+ * 벤치마크 옵션:
+ * - fillseq                 : 비동기 모드에서 순차적인 키 순서로 N개의 값을 작성합니다.
+ * - fillseqdeterministic    : 지정된 키 순서로 N개의 값을 작성하며 LSM 트리의 구조를 유지합니다.
+ * - fillrandom              : 비동기 모드에서 랜덤 키 순서로 N개의 값을 작성합니다.
+ * - filluniquerandomdeterministic : 랜덤 키 순서로 N개의 값을 작성하며 LSM 트리의 구조를 유지합니다.
+ * - overwrite               : 비동기 모드에서 랜덤 키 순서로 N개의 값을 덮어씁니다.
+ * - fillsync                : 동기 모드에서 랜덤 키 순서로 N/1000 개의 값을 작성합니다.
+ * - fill100K                : 비동기 모드에서 랜덤 키 순서로 100KB 크기의 N/1000 개 값을 작성합니다.
+ * - deleteseq               : 순차적인 순서로 N개의 키를 삭제합니다.
+ * - deleterandom            : 랜덤 순서로 N개의 키를 삭제합니다.
+ * - readseq                 : N번 순차적으로 데이터를 읽습니다.
+ * - readtocache             : 1개의 스레드가 데이터베이스를 순차적으로 읽습니다.
+ * - readreverse             : N번 역순으로 데이터를 읽습니다.
+ * - readrandom              : N번 랜덤 순서로 데이터를 읽습니다.
+ * - readmissing             : N개의 누락된 키를 랜덤 순서로 읽습니다.
+ * - readwhilewriting        : 1개의 쓰기 작업과 N개의 스레드로 랜덤 읽기를 수행합니다.
+ * - readwhilemerging        : 1개의 병합 작업과 N개의 스레드로 랜덤 읽기를 수행합니다.
+ * - readwhilescanning       : 1개의 스레드가 전체 테이블을 스캔하며, N개의 스레드가 랜덤 읽기를 수행합니다.
+ * - readrandomwriterandom   : N개의 스레드가 랜덤 읽기 및 랜덤 쓰기를 동시에 수행합니다.
+ * - updaterandom            : 랜덤 키에 대해 N개의 스레드가 읽기-수정-쓰기 작업을 수행합니다.
+ * - xorupdaterandom         : 랜덤 키에 대해 N개의 스레드가 읽기-XOR-쓰기 작업을 수행합니다.
+ * - appendrandom            : 랜덤 키에 대해 값이 점점 커지는 읽기-수정-쓰기 작업을 수행합니다.
+ * - mergerandom             : merge 연산자를 사용하여 랜덤 읽기 또는 병합 작업을 수행합니다. merge_operator를 설정해야 합니다.
+ * - readrandommergerandom   : merge 연산자를 사용하여 랜덤 읽기 또는 병합 작업을 수행합니다.
+ * - newiterator             : 이터레이터를 반복적으로 생성합니다.
+ * - seekrandom              : N번 랜덤 탐색을 수행하고, 탐색마다 seek_nexts 횟수만큼 Next를 호출합니다.
+ * - seekrandomwhilewriting  : 랜덤 탐색 작업과 1개의 쓰기 작업을 동시에 수행합니다.
+ * - seekrandomwhilemerging  : 랜덤 탐색 작업과 1개의 병합 작업을 동시에 수행합니다.
+ * - crc32c                  : <block size> 크기의 데이터를 반복적으로 CRC32C로 계산합니다.
+ * - xxhash                  : <block size> 크기의 데이터를 반복적으로 xxHash로 계산합니다.
+ * - xxhash64                : <block size> 크기의 데이터를 반복적으로 xxHash64로 계산합니다.
+ * - xxh3                    : <block size> 크기의 데이터를 반복적으로 XXH3으로 계산합니다.
+ * - acquireload             : N * 1000번 로드 작업을 수행합니다.
+ * - fillseekseq             : 순차 키로 N개의 값을 작성한 후, 각 키를 탐색하며 읽습니다.
+ * - randomtransaction       : N개의 랜덤 트랜잭션을 실행하고 정확성을 검증합니다.
+ * - randomreplacekeys       : N개의 키를 랜덤으로 교체하며, 이전 버전을 삭제하고 새 버전을 추가합니다.
+ * - timeseries              : 1개의 쓰기 스레드가 시계열 데이터를 생성하고, 여러 읽기 스레드가 랜덤 읽기를 수행합니다.
+ * - compact                 : 데이터베이스 전체를 압축합니다. 여러 번 호출되면 무작위로 선택된 데이터를 압축합니다.
+ * - compactall              : 데이터베이스 전체를 압축합니다.
+ * - compact0                : L0 파일을 L1로 압축합니다.
+ * - compact1                : L1 파일을 L2로 압축합니다.
+ * - waitforcompaction       : 압축이 완료될 때까지 대기합니다.
+ * - flush                   : 메모리 테이블을 플러시합니다.
+ * - stats                   : 데이터베이스 통계를 출력합니다.
+ * - resetstats              : 데이터베이스 통계를 초기화합니다.
+ * - levelstats              : 각 레벨의 파일 수와 바이트 수를 출력합니다.
+ * - memstats                : 메모리 테이블 통계를 출력합니다.
+ * - sstables                : SSTable 정보를 출력합니다.
+ * - heapprofile             : 힙 프로파일을 덤프합니다. (이 포트에서 지원되는 경우)
+ * - replay                  : --trace_file로 지정된 트레이스 파일을 재생합니다.
+ * - getmergeoperands        : 특정 키에 대해 병합된 데이터를 가져와 성능을 비교합니다.
+ * - readrandomoperands      : `GetMergeOperands()`를 사용해 랜덤 키를 읽습니다.
+ * - backup                  : 현재 데이터베이스를 백업하고 새로운 백업의 무결성을 확인합니다.
+ * - restore                 : 최신 백업에서 데이터베이스를 복원합니다.
+ * - approximatememtablestats: `GetApproximateMemTableStats`의 정확성을 테스트합니다.
+ */
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
