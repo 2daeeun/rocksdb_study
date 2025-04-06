@@ -1,0 +1,4 @@
+--benchmarks=fillrandom,readrandom \
+--db=/home/jun/bench_rocksdb/fill_data_7M_fix \
+--num=7000000 \
+--value_size=4096

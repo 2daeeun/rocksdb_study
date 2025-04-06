@@ -1,0 +1,9 @@
+--benchmarks="readrandom,levelstats,stats,memstats" \
+--db=/home/jun/bench_rocksdb/fill_data_7M_fix \
+--use_secondary_db=1 \
+--secondary_path=/home/jun/bench_rocksdb/Secondary_path \
+--use_existing_db=1 \
+--histogram=true \
+--statistics \
+--value_size=4096 \
+--num=7000000
