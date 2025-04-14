@@ -1,0 +1,4 @@
+--benchmarks="fillrandom, compacta" \
+--db=/home/leedaeeun/bench_rocksdb/fill_data_1M_fix_ver2 \
+--num=1000000 \
+--value_size=4096

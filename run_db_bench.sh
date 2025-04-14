@@ -13,10 +13,10 @@ read USER_DIR_NAME
 
 if [ -z "$USER_DIR_NAME" ]; then
   DB_PATH="${BASE_DIR}/${TIMESTAMP}"
-  LOG_FILE="${BASE_DIR}/db_bench_result_${TIMESTAMP}.log"
+  LOG_FILE="${BASE_DIR}/${TIMESTAMP}.log"
 else
   DB_PATH="${BASE_DIR}/${USER_DIR_NAME}_${TIMESTAMP}"
-  LOG_FILE="${BASE_DIR}/db_bench_result_${USER_DIR_NAME}_${TIMESTAMP}.log"
+  LOG_FILE="${BASE_DIR}/${USER_DIR_NAME}_${TIMESTAMP}.log"
 fi
 
 # 데이터베이스 경로 디렉토리 생성
