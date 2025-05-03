@@ -1,0 +1,5 @@
+--benchmarks="fillrandom,levelstats,stats,memstats" \
+--db=/home/leedaeeun/bench_rocksdb/fillseq_dataset \
+--statistics \
+--value_size=4096 \
+--num=1000000

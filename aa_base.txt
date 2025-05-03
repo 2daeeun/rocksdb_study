@@ -1,0 +1,9 @@
+--benchmarks="readrandomwriterandom,levelstats,stats,memstats" \
+--db=/home/leedaeeun/bench_rocksdb/fillseq_dataset \
+--statistics \
+--value_size=4096 \
+--num=1000000 \
+--threads=2 \
+--readwritepercent=50 \
+--histogram=true \
+--use_existing_db=true
